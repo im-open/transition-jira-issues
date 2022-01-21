@@ -1,22 +1,35 @@
-name: 'Composite Run Steps Action Template'
+name: 'Transition Jira Tasks by Query'
 
-description: 'Add description here'
+description: 'Performs the given JQL query to find tickets and transition them to the given status.'
 
 inputs:
-  input-1:
-    description: 'Add a description here'
+  domain-name:
+    description: 'The domain name for Jira.'
     required: true
-
-outputs:
-  output-1:
-    description: 'Add description here'
-    value: '${{ steps.step_1.outputs.world }}'
+  jql-query:
+    description: 'The JQL query to use to find tickets that will be transitioned.'
+    required: true
+  transition-name:
+    description: 'The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.'
+    required: true
+  jira-username:
+    description: 'The username to login to Jira with in order to perform the transition. Will be ignored if not set.'
+    required: false
+  jira-password:
+    description: 'The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored.'
+    required: false
 
 runs:
   using: 'composite'
   steps:
-    - name: Step 1
-      id: step_1
-      shell: bash
+    - name: Transition Jira Tickets
+      shell: pwsh
       run: |
-        echo "::set-output name=hello::world"
+        [System.Security.SecureString] $securePassword = if(!!"${{ inputs.jira-password }}") { ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force } else { $null }
+
+        ${{ github.action_path }}/src/transition-jira-tasks.ps1 `
+          -JiraDomain "${{ inputs.domain-name }}" `
+          -JqlToQueryBy "${{ inputs.jql-query }}" `
+          -NewState "${{ inputs.transition-name }}" `
+          -JiraUsername "${{ inputs.jira-username }}" `
+          -JiraPassword $securePassword

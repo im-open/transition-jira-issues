@@ -1,80 +1,43 @@
-# composite-run-steps-action-template
+# transition-jira-tasks-by-query
 
-This template can be used to quickly start a new custom composite-run-steps action repository.  Click the `Use this template` button at the top to get started.
+This GitHub Action will query Jira using JQL provided as an input, and will transition any tickets it finds to a given status. Credentials can be provided in case they are necessary to perform the transition.
 
 ## Index
 
-- [Inputs](#inputs)
-- [Outputs](#outputs)
-- [Example](#example)
-- [Contributing](#contributing)
-  - [Incrementing the Version](#incrementing-the-version)
-- [Code of Conduct](#code-of-conduct)
-- [License](#license)
-  
-## TODOs
-- Readme
-  - [ ] Update the Inputs section with the correct action inputs
-  - [ ] Update the Outputs section with the correct action outputs
-  - [ ] Update the Example section with the correct usage   
-- action.yml
-  - [ ] Fill in the correct name, description, inputs and outputs and implement steps
-- CODEOWNERS
-  - [ ] Update as appropriate
-- Repository Settings
-  - [ ] On the *Options* tab check the box to *Automatically delete head branches*
-  - [ ] On the *Options* tab update the repository's visibility
-  - [ ] On the *Branches* tab add a branch protection rule
-    - [ ] Check *Require pull request reviews before merging*
-    - [ ] Check *Dismiss stale pull request approvals when new commits are pushed*
-    - [ ] Check *Require review from Code Owners*
-    - [ ] Check *Include Administrators*
-  - [ ] On the *Manage Access* tab add the appropriate groups
-- About Section (accessed on the main page of the repo, click the gear icon to edit)
-  - [ ] The repo should have a short description of what it is for
-  - [ ] Add one of the following topic tags:
-    | Topic Tag       | Usage                                    |
-    | --------------- | ---------------------------------------- |
-    | az              | For actions related to Azure             |
-    | code            | For actions related to building code     |
-    | certs           | For actions related to certificates      |
-    | db              | For actions related to databases         |
-    | git             | For actions related to Git               |
-    | iis             | For actions related to IIS               |
-    | microsoft-teams | For actions related to Microsoft Teams   |
-    | svc             | For actions related to Windows Services  |
-    | jira            | For actions related to Jira              |
-    | meta            | For actions related to running workflows |
-    | pagerduty       | For actions related to PagerDuty         |
-    | test            | For actions related to testing           |
-    | tf              | For actions related to Terraform         |
-  - [ ] Add any additional topics for an action if they apply    
-    
+- [transition-jira-tasks-by-query](#transition-jira-tasks-by-query)
+  - [Index](#index)
+  - [Inputs](#inputs)
+  - [Example](#example)
+  - [Contributing](#contributing)
+    - [Incrementing the Version](#incrementing-the-version)
+  - [Code of Conduct](#code-of-conduct)
+  - [License](#license)
+      
 
 ## Inputs
-| Parameter | Is Required | Description           |
-| --------- | ----------- | --------------------- |
-| `input`   | true        | Description goes here |
-
-## Outputs
-| Output   | Description           |
-| -------- | --------------------- |
-| `output` | Description goes here |
+| Parameter         | Is Required | Description                                                                                                                                                           |
+| ----------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain-name`     | true        | The domain name for Jira.                                                                                                                                             |
+| `jql-query`       | true        | The JQL query to use to find tickets that will be transitioned.                                                                                                       |
+| `transition-name` | true        | The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.                                                                       |
+| `jira-username`   | false       | The username to login to Jira with in order to perform the transition. Will be ignored if not set.                                                                    |
+| `jira-password`   | false       | The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored. |
 
 ## Example
 
 ```yml
-# TODO: Fill in the correct usage
 jobs:
-  job1:
+  transition-jira-ticket:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-
-      - name: ''
-        uses: im-open/thisrepo@v1.0.0 # TODO: fix the action name
+      - name: 'Transition Jira Ticket to Deployed Status'
+        uses: im-open/transition-jira-tasks-by-query@v1.0.0
         with:
-          input-1: ''
+          domain-name: 'jira.com'
+          jql-query: 'issuekey=PROJ-12345'
+          transition-name: 'Deployed'
+          jira-username: 'some-user'
+          jira-password: ${{ secrets.JIRA_USER_PASSWORD }}
 ```
 
 ## Contributing
