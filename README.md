@@ -34,7 +34,7 @@ jobs:
         uses: im-open/transition-jira-tasks-by-query@v1.1.0
         with:
           domain-name: 'jira.com'
-          jql-query: 'issuekey=PROJ-12345' or 'filter="My Filter Name"'
+          jql-query: 'issuekey=PROJ-12345' or "filter='My Filter Name'"
           transition-name: 'Deployed'
           jira-username: 'some-user'
           jira-password: ${{ secrets.JIRA_USER_PASSWORD }}
