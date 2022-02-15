@@ -39,7 +39,9 @@ jobs:
           transition-name: 'Deployed'
           
           jql-query: 'issuekey=PROJ-12345'
-          # jql-query: "filter='My Filter Name'"
+          # jql-query: "filter='My Filter Name' AND issuekey=PROJ-12345"
+          # jql-query: 'component IN ("System Infrastructure') AND 'Deployment Version' ~ 'v1.2.1''
+          # etc.
 ```
 
 ## Contributing
