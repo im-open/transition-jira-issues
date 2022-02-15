@@ -31,13 +31,17 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: 'Transition Jira Ticket to Deployed Status'
-        uses: im-open/transition-jira-tasks-by-query@v1.0.0
+        uses: im-open/transition-jira-tasks-by-query@v1.1.0
         with:
-          domain-name: 'jira.com'
-          jql-query: 'issuekey=PROJ-12345'
-          transition-name: 'Deployed'
           jira-username: 'some-user'
           jira-password: ${{ secrets.JIRA_USER_PASSWORD }}
+          domain-name: 'jira.com'
+          transition-name: 'Deployed'
+          
+          jql-query: 'issuekey=PROJ-12345'
+          # jql-query: "filter='My Filter Name' AND issuekey=PROJ-12345"
+          # jql-query: 'component IN ("System Infrastructure') AND 'Deployment Version' ~ 'v1.2.1''
+          # etc.
 ```
 
 ## Contributing

@@ -49,7 +49,7 @@ function Invoke-JiraTransitionTickets {
         [string]$Transition
     );
 
-    $api = New-Object -TypeName System.Uri -ArgumentList $BaseUri, ("/rest/api/2/search?jql=" + $Jql)
+    $api = New-Object -TypeName System.Uri -ArgumentList $BaseUri, ("/rest/api/2/search?jql=" + [System.Web.HttpUtility]::UrlEncode($Jql))
     $json = Invoke-JiraQuery -Query $api -Username $Username -Password $Password
 
     If ($json.total -eq 0) {
