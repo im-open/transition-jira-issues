@@ -1,6 +1,6 @@
-name: 'Transition Jira Tasks by Query'
+name: Transition Jira Tasks by Query
 
-description: 'Performs the given JQL query to find tickets and transition them to the given status.'
+description: Performs the given JQL query to find tickets and transition them to the given status.
 
 inputs:
   domain-name:
