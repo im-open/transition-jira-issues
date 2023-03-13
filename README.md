@@ -31,7 +31,8 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: 'Transition Jira Ticket to Deployed Status'
-        uses: im-open/transition-jira-tasks-by-query@v1.1.1
+        # You may also reference just the major or major.minor version
+        uses: im-open/transition-jira-tasks-by-query@v1.1.2
         with:
           jira-username: 'some-user'
           jira-password: ${{ secrets.JIRA_USER_PASSWORD }}
