@@ -1,9 +1,11 @@
 param (
     [string]$JiraDomain,
     [string]$JqlToQueryBy,
-    [string[]]$issueKeys,
+    [string[]]$IssueKeys,
     [string]$NewState,
-    [PSCustomObject]$updateFields,
+    [PSCustomObject]$Fields,
+    [PSCustomObject]$Updates,
+    [string]$Comments
     [string]$JiraUsername,
     [securestring]$JiraPassword
 )
@@ -15,26 +17,32 @@ $ErrorActionPreference = "Stop"
 
 $baseJiraUri = New-Object -TypeName System.Uri -ArgumentList "https://$JiraDomain/"
 
-if ([string]::IsNullOrEmpty($JqlToQueryBy) -And  -And 
+if ([string]::IsNullOrEmpty($JqlToQueryBy) -And $IssueKeys.length -gt 0) {
+    $JqlToQueryBy = "key IN (""$($IssueKeys -join '", ')"")"
+}
 
-$issues = Invoke-JiraTransitionTickets -BaseUri $baseJiraUri `
+$processedIssue = Invoke-JiraTransitionTickets -BaseUri $baseJiraUri `
     -Username $JiraUsername `
     -Password $JiraPassword `
     -Jql $JqlToQueryBy `
-    -Transition $NewState
+    -Transition $NewState `
+    -Fields $Fields `
+    -Updates $Updates `
+    -Comment $Comment
     
-$identifiedIssues = $issues.Keys
-$transitionedIssues = $issues | Where-Object { $_.Value -eq $true } | Select-Object { $_.Key }
-$failedIssues = $issues | Where-Object { $_.Value -eq $false } | Select-Object { $_.Key }
+$identifiedIssueKeys = $processedIssues.Keys
+$transitionedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $true } | Select-Object { $_.Key }
+$failedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $false } | Select-Object { $_.Key }
+$notFoundIssueKeys = $IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }   #intersection
     
-"identified-issues=$($identifiedIssues -join ', ')" >> $env:GITHUB_OUTPUT
-"identified-issues-as-json=$($identifiedIssues | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+"identified-issues=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+"identified-issues-as-json=$($identifiedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 
-"transitioned-issues=$($transitionedIssues -join ', ')" >> $env:GITHUB_OUTPUT
-"transitioned-issues-as-json=$($transitionedIssues | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+"transitioned-issues=$($transitionedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+"transitioned-issues-as-json=$($transitionedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 
-"failed-issues=$($failedIssues -join ', ')" >> $env:GITHUB_OUTPUT
-"failed-issues-as-json=$($transitionedIssues | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+"failed-issues=$($failedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+"failed-issues-as-json=$($failedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 
-"notfound-issues=$($issuesNotFound -join ', ')" >> $env:GITHUB_OUTPUT
-"notfound-issues-as-json=$($issuesNotFound | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+"notfound-issues=$($notFoundIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+"notfound-issues-as-json=$($notFoundIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
