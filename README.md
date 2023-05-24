@@ -12,25 +12,33 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
     - [Incrementing the Version](#incrementing-the-version)
   - [Code of Conduct](#code-of-conduct)
   - [License](#license)
-      
+
 
 ## Inputs
-| Parameter         | Is Required | Description                                                                                                                                                           |
-| ----------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `domain-name`     | true        | The domain name for Jira.                                                                                                                                             |
-| `jql-query`       | maybe       | The JQL query to use to find tickets that will be transitioned. If provided, will override any issues passed in the `issues` input.                                   |
-| `issues`          | maybe       | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment                                    |
-| `transition-name` | true        | The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.                                                                       |
-| `jira-username`   | false       | The username to login to Jira with in order to perform the transition. Will be ignored if not set.                                                                    |
-| `jira-password`   | false       | The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored. |
+| Parameter                  | Is Required    | Description                                                                                                                                                                                                                      |
+|----------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `domain-name`              | true           | The domain name for Jira.                                                                                                                                                                                                        |
+| `jql-query`                | conditionally* | The JQL query to use to find tickets that will be transitioned.                                                                                                                                                                  |
+| `issues`                   | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
+| `transition-name`          | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
+| `overwrite-fields`         | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. | 
+| `update-operations`        | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
+| `comment`                  | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
+| `fail-if-issues-not-found` | false          | The action will fail if no issues are found. Otherwise, the action will succeed if no issues are found. _`false` by default._                                                                                                    |
+| `fail-jira-inaccessible`   | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline. _`false` by default._                                                                                                       |
+| `jira-username`            | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
+| `jira-password`            | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
 
-> Either `jql-query` or `issues` input must be provided.
+<sup>*</sup> Either `jql-query` or `issues` input is required.  If both are provider, `jql-query` will be used.
 
 ## Outputs
 
-| Output     | Description            |
-|------------|------------------------|
-| `identified-issues-from-query` | Issues from query or issues that exist in Jira from the generated query. |
+| Output                | Description                                                                             |
+|-----------------------|-----------------------------------------------------------------------------------------|
+| `identified-issues`    | Issues found in JIra using the `jql-query` or `issues` input.                           |
+| `transitioned-issues` | Issues successfully transitioned.                                                       |
+| `failed-issues`       | Issues that where not successfully transitioned which where identified.                 |
+| `notfound-issues`     | Issues that were not found from the `issues` input.                                     |
 
 ## Example
 
@@ -51,8 +59,59 @@ jobs:
           jql-query: 'issuekey=PROJ-12345'
           # jql-query: "filter='My Filter Name' AND issuekey=PROJ-12345"
           # jql-query: 'component IN ("System Infrastructure') AND 'Deployment Version' ~ 'v1.2.1''
+          # issues: TW-1234, TW-4455
+          # issues: |
+          #   TW-1234
+          #   TW-4455
           # etc.
+
+          # If you want to update or overwrite fields, you can use the following inputs:
+          # overwrite-fields: |
+          #   {
+          #     "customfield_12345": "some value"
+          #   } 
 ```
+
+## Updating Fields
+
+They are two different ways to update fields.  Passing a `overwrite-fields` input or an `update-operations` input. You may not specify the same field name in both the `overwrite-fields` and `update-operations` inputs.
+
+If you are unsure what field names to use, invoke the [Get Issue Meta Data API Endpoint](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-get) to get a list of fields on that issue type.
+
+> See [Atlassian Edit Issues Example](https://developer.atlassian.com/server/jira/platform/jira-rest-api-example-edit-issues-6291632/) for additional help
+
+### Overwrite Fields Input
+The easiest solution is to pass `overwrite-fields` input with static changes. These must be screen fields -- fields that a user can edit in Jira on the specific issue type.  If the field doesn't exist on the issue type, it will be ignored.
+
+_The `overwrite-fields` input would be something like:_
+
+```
+"fields": {
+    "assignee": {
+      "name": "bob"
+    },
+    "resolution": {
+      "name": "Fixed"
+    },
+    "customfield_40000": {
+      "value": "red"
+    }
+  }
+```
+
+### Update Operations Input
+
+Update fields by operations. Like adding a comment, creating a link to another ticket, adding additional values to a multi-select field, etc.  Updates all you to add or remove additional values to fields without overwriting what is already there.
+
+_The `updates` fields would be something like:_
+
+```
+"update" : {
+  "components" : [{"remove" : {"name" : "Trans/A"}}, {"add" : {"name" : "Trans/M"}}]
+}
+```
+
+> If a field is specific that is not on the issue type, the operation will fail.
 
 ## Contributing
 
@@ -65,7 +124,7 @@ When a pull request is created and there are changes to code-specific files and 
 
 - `action.yml`
 - `src/**`
-There may be some instances where the bot does not have permission to push changes back to the branch though so this step should be done manually for those branches. See [Incrementing the Version](#incrementing-the-version) for more details.
+  There may be some instances where the bot does not have permission to push changes back to the branch though so this step should be done manually for those branches. See [Incrementing the Version](#incrementing-the-version) for more details.
 
 ### Incrementing the Version
 
