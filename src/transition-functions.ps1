@@ -54,10 +54,11 @@ function Invoke-JiraTransitionTickets {
 
     If ($json.total -eq 0) {
         Write-Output "No issues were found that matched your query : $Jql"
+        return
     }
-    Else {
-        ForEach ($issue in $json.issues) {
-            Invoke-JiraTransitionTicket -IssueUri $issue.self -IssueKey $issue.key -Transition $Transition -Username $Username -Password $Password
-        }
+    
+    $json.issues | ForEach-Object -Parallel {
+        $issue = $_
+        Invoke-JiraTransitionTicket -IssueUri $issue.self -IssueKey $issue.key -Transition $Transition -Username $Username -Password $Password
     }
 }
