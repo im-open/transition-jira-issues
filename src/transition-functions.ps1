@@ -31,6 +31,9 @@ function Invoke-JiraTransitionTicket {
     
     if ($null -ne $match) {
         $transitionId = $match.id
+        
+        # TODO: pass in fields and updates. 
+        # Instead of adding a comment that GitHub action made the change, add it to the history instead.
         $body = "{ ""update"": { ""comment"": [ { ""add"" : { ""body"" : ""$comment"" } } ] }, ""transition"": { ""id"": ""$transitionId"" } }"
         
         return Invoke-JiraTicketTransition -Uri $uri -Body $body -Username $Username -Password $Password
