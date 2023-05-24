@@ -42,7 +42,7 @@ function Invoke-JiraTransitionTicket {
 }
 
 function Invoke-JiraTransitionTickets {
-    [OutputType([string[]])]
+    [OutputType([hashtable[]])]
     Param (
         [Uri]$BaseUri,
         [string]$Username,
@@ -59,19 +59,18 @@ function Invoke-JiraTransitionTickets {
         return @()
     }
     
-    $identifiedIssueKeys = | Select-Object { $_.key }
-    "identified-issues-from-query=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+    $processedIssues = @{}
+    $json.issues | ForEach-Object { $processedIssues.Add($_.key, $false) }
     
-    $transitionedIssueKeys = @()
     $json.issues | ForEach-Object -Parallel {
         $issue = $_
         $result = Invoke-JiraTransitionTicket -IssueUri $issue.self -IssueKey $issue.key -Transition $Transition -Username $Username -Password $Password
+        $processedIssues[$issue.key] = $result
         
         if ($result) {
             Write-Information "Successfully transitioned ticket $($issue.key) to the state $Transition"
-            $transitionedIssueKeys += $issue.key
         }
     }
     
-    return $transitionedIssueKeys
+    return $processedIssues
 }
