@@ -12,6 +12,7 @@ function Invoke-JiraGetTransitions {
 }
 
 function Invoke-JiraTransitionTicket {
+    [OutputType([boolean])]
     Param (
         [Uri]$IssueUri,
         [string]$IssueKey,
@@ -34,13 +35,16 @@ function Invoke-JiraTransitionTicket {
 
         Invoke-JiraTicketTransition -Uri $uri -Body $body -Username $Username -Password $Password
         Write-Output "Successfully transitioned ticket $IssueKey to the state $Transition"
+        return $true
     }
     else {
         Write-Output "The transition $Transition is not valid for the issue $IssueKey."
+        return $false
     }
 }
 
 function Invoke-JiraTransitionTickets {
+    [OutputType([string[]])]
     Param (
         [Uri]$BaseUri,
         [string]$Username,
@@ -54,11 +58,18 @@ function Invoke-JiraTransitionTickets {
 
     If ($json.total -eq 0) {
         Write-Output "No issues were found that matched your query : $Jql"
-        return
+        return @()
     }
     
+    $successfulTransitionedIssues = @()
     $json.issues | ForEach-Object -Parallel {
         $issue = $_
-        Invoke-JiraTransitionTicket -IssueUri $issue.self -IssueKey $issue.key -Transition $Transition -Username $Username -Password $Password
+        $result = Invoke-JiraTransitionTicket -IssueUri $issue.self -IssueKey $issue.key -Transition $Transition -Username $Username -Password $Password
+        
+        if ($result) {
+            $successfulTransitionedIssues += $issue
+        }
     }
+    
+    return $successfulTransitionedIssues
 }
