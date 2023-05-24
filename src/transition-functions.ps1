@@ -32,10 +32,8 @@ function Invoke-JiraTransitionTicket {
     if ($null -ne $match) {
         $transitionId = $match.id
         $body = "{ ""update"": { ""comment"": [ { ""add"" : { ""body"" : ""$comment"" } } ] }, ""transition"": { ""id"": ""$transitionId"" } }"
-
-        Invoke-JiraTicketTransition -Uri $uri -Body $body -Username $Username -Password $Password
-        Write-Output "Successfully transitioned ticket $IssueKey to the state $Transition"
-        return $true
+        
+        return Invoke-JiraTicketTransition -Uri $uri -Body $body -Username $Username -Password $Password
     }
     else {
         Write-Output "The transition $Transition is not valid for the issue $IssueKey."
@@ -67,6 +65,7 @@ function Invoke-JiraTransitionTickets {
         $result = Invoke-JiraTransitionTicket -IssueUri $issue.self -IssueKey $issue.key -Transition $Transition -Username $Username -Password $Password
         
         if ($result) {
+            Write-Output "Successfully transitioned ticket $($issue.key) to the state $Transition"
             $successfulTransitionedIssues += $issue
         }
     }
