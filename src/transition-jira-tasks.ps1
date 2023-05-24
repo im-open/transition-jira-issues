@@ -1,7 +1,9 @@
 param (
     [string]$JiraDomain,
     [string]$JqlToQueryBy,
+    [string[]]$issueKeys,
     [string]$NewState,
+    [PSCustomObject]$updateFields,
     [string]$JiraUsername,
     [securestring]$JiraPassword
 )
@@ -12,6 +14,8 @@ $ErrorActionPreference = "Stop"
 . $PSScriptRoot\transition-functions.ps1
 
 $baseJiraUri = New-Object -TypeName System.Uri -ArgumentList "https://$JiraDomain/"
+
+if ([string]::IsNullOrEmpty($JqlToQueryBy) -And  -And 
 
 $issues = Invoke-JiraTransitionTickets -BaseUri $baseJiraUri `
     -Username $JiraUsername `
