@@ -18,10 +18,15 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 | Parameter         | Is Required | Description                                                                                                                                                           |
 | ----------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `domain-name`     | true        | The domain name for Jira.                                                                                                                                             |
-| `jql-query`       | true        | The JQL query to use to find tickets that will be transitioned.                                                                                                       |
+| `jql-query`       | maybe       | The JQL query to use to find tickets that will be transitioned. If provided, will override any issues passed in the `issues` input.                                   |
+| `issues`          | maybe       | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment                                    |
 | `transition-name` | true        | The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.                                                                       |
 | `jira-username`   | false       | The username to login to Jira with in order to perform the transition. Will be ignored if not set.                                                                    |
 | `jira-password`   | false       | The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored. |
+
+> Either `jql-query` or `issues` input must be provided.
+
+identified-issues-from-query
 
 ## Example
 
