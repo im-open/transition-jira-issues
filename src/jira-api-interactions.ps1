@@ -5,7 +5,7 @@ function Invoke-JiraQuery {
         [securestring]$Password
     );
 
-    Write-Host "Querying the Jira API $($Query.AbsoluteUri)"
+    Write-Information "Querying the Jira API $($Query.AbsoluteUri)"
 
     $queryResult = $null
 
@@ -36,7 +36,7 @@ function Invoke-JiraTicketTransition {
         [securestring]$Password
     );
 
-    Write-Host "Posting to the Jira API $($Uri.AbsoluteUri)"
+    Write-Information "Posting to the Jira API $($Uri.AbsoluteUri)"
     
     $arguments = @{
       Uri = $Query
