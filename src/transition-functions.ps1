@@ -36,7 +36,7 @@ function Invoke-JiraTransitionTicket {
         return Invoke-JiraTicketTransition -Uri $uri -Body $body -Username $Username -Password $Password
     }
     else {
-        Write-Output "The transition $Transition is not valid for the issue $IssueKey."
+        Write-Information "The transition $Transition is not valid for the issue $IssueKey."
         return $false
     }
 }
@@ -55,20 +55,23 @@ function Invoke-JiraTransitionTickets {
     $json = Invoke-JiraQuery -Query $api -Username $Username -Password $Password
 
     If ($json.total -eq 0) {
-        Write-Output "No issues were found that matched your query : $Jql"
+        Write-Information "No issues were found that matched your query : $Jql"
         return @()
     }
     
-    $successfulTransitionedIssues = @()
+    $identifiedIssueKeys = | Select-Object { $_.key }
+    "identified-issues-from-query=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+    
+    $transitionedIssueKeys = @()
     $json.issues | ForEach-Object -Parallel {
         $issue = $_
         $result = Invoke-JiraTransitionTicket -IssueUri $issue.self -IssueKey $issue.key -Transition $Transition -Username $Username -Password $Password
         
         if ($result) {
-            Write-Output "Successfully transitioned ticket $($issue.key) to the state $Transition"
-            $successfulTransitionedIssues += $issue
+            Write-Information "Successfully transitioned ticket $($issue.key) to the state $Transition"
+            $transitionedIssueKeys += $issue.key
         }
     }
     
-    return $successfulTransitionedIssues
+    return $transitionedIssueKeys
 }
