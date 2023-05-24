@@ -26,7 +26,11 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 
 > Either `jql-query` or `issues` input must be provided.
 
-identified-issues-from-query
+## Outputs
+
+| Output     | Description            |
+|------------|------------------------|
+| `identified-issues-from-query` | Issues from query or issues that exist in Jira from the generated query. |
 
 ## Example
 
