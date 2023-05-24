@@ -63,6 +63,7 @@ function Invoke-JiraTicketTransition {
       return true
     }
     
+    # TODO: identify what other status codes are returned when a transition is denied due to restrictions
     if ($statusCode -eq 404) {
       return false
     }
