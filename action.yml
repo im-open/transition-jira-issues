@@ -7,8 +7,11 @@ inputs:
     description: 'The domain name for Jira.'
     required: true
   jql-query:
-    description: 'The JQL query to use to find tickets that will be transitioned.'
-    required: true
+    description: The JQL query to use to find tickets that will be transitioned. If provided, will override any issues passed in the 'issues' input.
+    required: false
+  issues:
+    description: Comma delimited list of issues to transition.
+    required: false
   transition-name:
     description: 'The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.'
     required: true
@@ -26,10 +29,22 @@ runs:
       shell: pwsh
       run: |
         [System.Security.SecureString] $securePassword = if(!!"${{ inputs.jira-password }}") { ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force } else { $null }
+        
+        $JqlToQueryBy = "${{ inputs.jql-query }}".Trim()
+        $IssueList = "${{ inputs.issues }}".Trim()
+        
+        if ([string]::IsNullOrEmpty($JqlToQueryBy) -And [string]::IsNullOrEmpty($IssueList)) {
+          Write-Output "::error::Either 'jql-query' or 'issues' input are required"
+          exit 1
+        }
+        
+        $Issues = $issueList -split "\n"
+        $Issues = $issueList -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
 
         ${{ github.action_path }}/src/transition-jira-tasks.ps1 `
           -JiraDomain "${{ inputs.domain-name }}" `
-          -JqlToQueryBy "${{ inputs.jql-query }}" `
+          -JqlToQueryBy $JqlToQueryBy `
+          -Issues $Issues
           -NewState "${{ inputs.transition-name }}" `
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword
