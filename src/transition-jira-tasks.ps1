@@ -3,9 +3,9 @@ param (
     [string]$JqlToQueryBy,
     [string[]]$IssueKeys,
     [string]$NewState,
-    [PSCustomObject]$Fields,
-    [PSCustomObject]$Updates,
-    [string]$Comments
+    [hashtable]$Fields,
+    [hashtable]$Updates,
+    [string]$Comment,
     [string]$JiraUsername,
     [securestring]$JiraPassword
 )
@@ -33,7 +33,7 @@ $processedIssue = Invoke-JiraTransitionTickets -BaseUri $baseJiraUri `
 $identifiedIssueKeys = $processedIssues.Keys
 $transitionedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $true } | Select-Object { $_.Key }
 $failedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $false } | Select-Object { $_.Key }
-$notFoundIssueKeys = $IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }   #intersection
+$notFoundIssueKeys = $IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }
     
 "identified-issues=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
 "identified-issues-as-json=$($identifiedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
