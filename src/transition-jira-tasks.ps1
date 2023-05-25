@@ -6,6 +6,8 @@ param (
     [hashtable]$Fields,
     [hashtable]$Updates,
     [string]$Comment,
+    [boolean]$FailIfNoTransitionedIssues = $false,
+    [boolean]$FailIfJiraInaccessible = $false,
     [string]$JiraUsername,
     [securestring]$JiraPassword
 )
@@ -17,24 +19,43 @@ $ErrorActionPreference = "Stop"
 
 $baseJiraUri = New-Object -TypeName System.Uri -ArgumentList "https://$JiraDomain/"
 
-if ([string]::IsNullOrEmpty($JqlToQueryBy) -And $IssueKeys.length -gt 0) {
+If ([string]::IsNullOrEmpty($JqlToQueryBy) -And $IssueKeys.Length -gt 0) {
     $JqlToQueryBy = "key IN (""$($IssueKeys -join '", ')"")"
 }
 
-$processedIssue = Invoke-JiraTransitionTickets -BaseUri $baseJiraUri `
+$issues = Get-JiraIssuesByQueryByQuery -BaseUri $BaseUri -Jql $JqlToQueryBy -Username $Username -Password $Password
+If ($issues.Length -gt 10) {
+  Write-Error "Too many issues returned by the query. Please narrow down the query to return less than or equal to 10 issues."
+  Exit 1
+}
+
+$processedIssue = Invoke-JiraTransitionTickets `
+    -Issues $issues `
+    -BaseUri $baseJiraUri `
     -Username $JiraUsername `
     -Password $JiraPassword `
-    -Jql $JqlToQueryBy `
-    -Transition $NewState `
+    -TransitionName ($NewState.Trim()) `
     -Fields $Fields `
     -Updates $Updates `
-    -Comment $Comment
+    -Comment $Comment `
+    -FailIfJiraInaccessible $FailIfJiraInaccessible
     
 $identifiedIssueKeys = $processedIssues.Keys
 $transitionedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $true } | Select-Object { $_.Key }
 $failedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $false } | Select-Object { $_.Key }
 $notFoundIssueKeys = $IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }
-    
+
+If ($queryResult.total -eq 0 -And $FailIfNoTransitionedIssues) {
+  Write-Error "No issues were found that matched your query : $JqlToQueryBy"
+  exit 1
+}
+
+If ($queryResult.total -eq 0 -And !$FailIfNoTransitionedIssues) {
+  Write-Warning "No issues were found that matched your query : $JqlToQueryBy"
+  return
+}
+
+# Outputs
 "identified-issues=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
 "identified-issues-as-json=$($identifiedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 

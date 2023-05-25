@@ -15,6 +15,7 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 
 
 ## Inputs
+
 | Parameter                  | Is Required    | Description                                                                                                                                                                                                                      |
 |----------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `domain-name`              | true           | The domain name for Jira.                                                                                                                                                                                                        |
@@ -22,10 +23,10 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 | `issues`                   | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
 | `transition-name`          | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
 | `overwrite-fields`         | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. | 
-| `update-operations`        | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
+| `process-operations`        | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
 | `comment`                  | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
-| `fail-if-issues-not-found` | false          | The action will fail if no issues are found. Otherwise, the action will succeed if no issues are found. _`false` by default._                                                                                                    |
-| `fail-jira-inaccessible`   | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline. _`false` by default._                                                                                                       |
+| `fail-if-issues-not-found` | false          |  Fail if no issues are found or no issues transitioned. _`false` by default._                                                                                                    |
+| `fail-if-jira-inaccessible` | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline. _`false` by default._                                                                                                       |
 | `jira-username`            | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
 | `jira-password`            | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
 
@@ -74,9 +75,9 @@ jobs:
 
 ## Updating Fields
 
-They are two different ways to update fields.  Passing a `overwrite-fields` input or an `update-operations` input. You may not specify the same field name in both the `overwrite-fields` and `update-operations` inputs.
+They are two different ways to update fields.  Passing a `overwrite-fields` input or an `process-operations` input. You may not specify the same field name in both the `overwrite-fields` and `process-operations` inputs.
 
-If you are unsure what field names to use, invoke the [Get Issue Meta Data API Endpoint](https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-get) to get a list of fields on that issue type.
+If you are unsure what field names to use, run the [Get-Jira-Issue](../main/Get-Jira-Issue.ps1) script locally from your machine using your ExtendHealth username and password.
 
 > See [Atlassian Edit Issues Example](https://developer.atlassian.com/server/jira/platform/jira-rest-api-example-edit-issues-6291632/) for additional help
 

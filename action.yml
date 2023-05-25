@@ -22,7 +22,7 @@ inputs:
     description: A map of issue screen fields to overwrite, specifying the sub-field to update and its value for each field. When multiple sub-fields or other operations are required, use 'update' input instead.
     required: false
     
-  update-operations: 
+  process-operations: 
     description: A map containing the field name and a list of operations to perform. The fields included in here cannot be included in 'fields' input.
     required: false
     
@@ -31,7 +31,12 @@ inputs:
     required: false
 
   fail-if-issues-not-found:
-    description: The action will fail if no issues are found. Otherwise, the action will succeed if no issues are found.
+    description: Fail if no issues are found or no issues transitioned.
+    required: false
+    default: 'false'
+
+  fail-if-jira-inaccessible:
+    description:  Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline.
     required: false
     default: 'false'
     
@@ -50,14 +55,14 @@ runs:
       shell: pwsh
       env:
         FIELDS: ${{ inputs.overwrite-fields }}
-        UPDATES: ${{ inputs.update-operations }}
+        UPDATES: ${{ inputs.process-operations }}
       run: |
-        [System.Security.SecureString] $securePassword = if(!!"${{ inputs.jira-password }}") { ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force } else { $null }
+        [System.Security.SecureString] $securePassword = if(!!"${{ inputs.jira-password }}") { ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force } Else { $null }
         
         $JqlToQueryBy = "${{ inputs.jql-query }}".Trim()
         $IssueList = "${{ inputs.issues }}".Trim()
         
-        if ([string]::IsNullOrEmpty($JqlToQueryBy) -And [string]::IsNullOrEmpty($IssueList)) {
+        If ([string]::IsNullOrEmpty($JqlToQueryBy) -And [string]::IsNullOrEmpty($IssueList)) {
           Write-Output "::error::Either 'jql-query' or 'issues' input are required"
           exit 1
         }
@@ -77,4 +82,6 @@ runs:
           -Updates $Updates
           -Comment "${{ inputs.comment }}" `
           -JiraUsername "${{ inputs.jira-username }}" `
-          -JiraPassword $securePassword
+          -JiraPassword $securePassword `
+          -FailIfNoTransitionedIssues ${{ inputs.fail-if-issues-not-found }}
+          -FailIfJiraInaccessible ${{ inputs.fail-if-jira-inaccessible }}
