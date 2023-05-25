@@ -1,4 +1,4 @@
-. $PSScriptRoot\jira-api-interactions.ps1
+Import-Module (Join-Path $PSScriptRoot "JiraApis.psm1")
 
 function New-Comment {
     Param (
@@ -92,59 +92,4 @@ function Invoke-JiraTransitionTicket {
       -FailIfJiraInaccessible $FailIfJiraInaccessible
 }
 
-function Invoke-JiraTransitionTickets {
-    [OutputType([hashtable[]])]
-    Param (
-        [hashtable]$AuthorizationHeaders,
-        [PSCustomObject[]]$Issues,
-        [string]$TransitionName,
-        [PSCustomObject]$Fields = @{},
-        [PSCustomObject]$Updates = @{},
-        [string]$Comment = "",
-        [boolean]$FailIfJiraInaccessible = $false
-    );
-
-    # https://stackoverflow.com/questions/61273189/how-to-pass-a-custom-function-inside-a-foreach-object-parallel
-
-    $processedIssues = [System.Collections.Concurrent.ConcurrentDictionary[string, boolean]]::new()
-    $Issues | ForEach-Object -Parallel {
-        $issue = $_
-        $safeProcessedIssues = $using:processedIssues
-        $safeTranstionName = $using:TransitionName
-        $safeFailIfJiraInaccessible = $using:FailIfJiraInaccessible
-
-        . $using:PSScriptRoot\transition-functions.ps1
-
-        try {
-            
-            $result = Invoke-JiraTransitionTicket `
-              -AuthorizationHeaders $AuthorizationHeaders `
-              -Issue $issue `
-              -TransitionName $safeTranstionName `
-              -Fields $using:Fields `
-              -Updates $using:Updates `
-              -Comment $using:Comment `
-              -FailIfJiraInaccessible $safeFailIfJiraInaccessible 
-
-            # If ($result) {
-            #   Write-Information "Successfully transitioned ticket [$($issue.key)] to the state [$safeTranstionName]"
-            # }
-            # Else {
-            #   Write-Warning "Failed to transition ticket [$($issue.key)] to the state [$safeTranstionName]" 
-            # }
-              
-            $safeProcessedIssues.TryAdd($issue.key, $result)
-      }
-      catch {
-          $safeProcessedIssues.TryAdd($issue.key, $false)
-          If ($safeFailIfJiraInaccessible) {
-              throw
-          }
-          Else {
-            Write-Error $_.Exception.Message 
-          }
-      } 
-  } -ThrottleLimit 20
-    
-  return $processedIssues
-}
+Export-ModuleMember -Function Invoke-JiraTransitionTicket

@@ -77,7 +77,7 @@ jobs:
 
 They are two different ways to update fields.  Passing a `overwrite-fields` input or an `process-operations` input. You may not specify the same field name in both the `overwrite-fields` and `process-operations` inputs.
 
-If you are unsure what field names to use, run the [Get-Jira-Issue](../main/Get-Jira-Issue.ps1) script locally from your machine using your ExtendHealth username and password.
+If you are unsure what field names to use, run the [Get-Jira-Issue](../main/Test-Get-Jira-Issue.ps1) script locally from your machine using your ExtendHealth username and password.
 
 > See [Atlassian Edit Issues Example](https://developer.atlassian.com/server/jira/platform/jira-rest-api-example-edit-issues-6291632/) for additional help
 

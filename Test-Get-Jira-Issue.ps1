@@ -1,15 +1,12 @@
 <#
   .SYNOPSIS
-  Transition Jira Issue. 
+  Gets Jira isssue details.
 
   .DESCRIPTION
-  Test transition Jira Issue prior to performing an action. 
+  Gets Jira isssue details to help determine what fields values the action should accept.
 
   .PARAMETER issue
   Jira issue key. i.e. ABC-1234
-
-  .PARAMETER transition
-  Jira transition name 
 
   .PARAMETER extendhealth-username
   Your ExtendHealth Jira username.
@@ -27,23 +24,12 @@
   Jira details as JSON 
 
   .EXAMPLE
-  PS> .\Test-Transition-Jira-Issue.ps1 -issue ABC-1234 -transition "In Progress" -username Joe -password 1234
+  PS> .\Test-Get-Jira-Issue.ps1 -issue ABC-1234 -username Joe -password 1234
 #>
 
 param (
     [Alias("issue")]
     [string]$IssueKey,
-
-    [Alias("transition")]
-    [string]$TransitionName,
-
-    [Alias("overwrite-fields")]
-    [hashtable]$Fields,
-    
-    [Alias("process-operations")]
-    [hashtable]$Updates,
-    
-    [string]$Comment,
 
     [Alias("extendhealth-username")]
     [string]$Username,
@@ -59,41 +45,32 @@ $global:InformationPreference = "Continue"
 $ErrorActionPreference = "Stop"
 
 Import-Module (Join-Path $PSScriptRoot "src" "modules" "JiraApis.psm1")
-Import-Module (Join-Path $PSScriptRoot "src" "modules" "TransitionIssue.psm1")
 
 try {
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
   $baseUri = New-Object -TypeName System.Uri -ArgumentList $JiraBaseUri
   $authorizationHeaders = Get-AuthorizationHeaders -Username $Username -Password $securePassword 
 
-  $issues = Get-JiraIssuesByQuery `
+  $issue = Get-JiraIssue `
     -BaseUri $baseUri `
-    -Jql "key = $IssueKey" `
+    -IssueKey $IssueKey `
     -AuthorizationHeaders $authorizationHeaders `
     -FailIfJiraInaccessible $true
 
-  if ($issues.Length -eq 0) {
+  # TODO: merge with issues fields to show the display name of the field
+  # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-custom-field-contexts/#api-rest-api-3-field-fieldid-context-get
+  # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-fields/#api-rest-api-3-field-get
+
+  # TODO: get fields required by transition
+
+  if ($issue -eq $null) {
     Write-Error "Issue [$IssueKey] not found"
     exit 1
   }
-    
-  $result = Invoke-JiraTransitionTicket `
-    -Issue $issues[0] `
-    -TransitionName $TransitionName `
-    -Fields $Fields `
-    -Updates $Updates `
-    -Comment $Comment `
-    -AuthorizationHeaders $authorizationHeaders `
-    -FailIfJiraInaccessible $true
 
-  if (!$result) {
-    Write-Error "Failed to transition ticket to the state $TransitionName"
-    exit 1
-  }
-    
-  Write-Information "Successfully transitioned ticket to state $TransitionName"
+  $issue | ConvertTo-Json -Depth 10 | Write-Output
+  Set-Content -Path "./issues.json" -Value ($issue | ConvertTo-Json -Depth 10)
 }
 finally {
   Remove-Module JiraApis
-  Remove-Module TransitionIssue
 }

@@ -67,17 +67,15 @@ runs:
           exit 1
         }
         
-        $Issues = $issueList -split "\n"
-        $Issues = $issueList -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
-        
+        $IssueKeys = @($issueList -split "\n") -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
         $Fields = $env:FIELDS | ConvertFrom-Json -AsHashtable
         $Updates = $env:UPDATES | ConvertFrom-Json -AsHashtable
 
         ${{ github.action_path }}/src/transition-jira-tasks.ps1 `
           -JiraDomain "${{ inputs.domain-name }}" `
           -JqlToQueryBy $JqlToQueryBy `
-          -Issues $Issues
-          -NewState "${{ inputs.transition-name }}" `
+          -IssueKeys $IssueKeys
+          -TransitionName "${{ inputs.transition-name }}" `
           -Fields $Fields
           -Updates $Updates
           -Comment "${{ inputs.comment }}" `
