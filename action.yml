@@ -47,45 +47,85 @@ inputs:
     
   jira-username:
     description: The username to login to Jira with in order to perform the transition. Will be ignored if not set.
-    required: false
+    required: true
     
   jira-password:
     description: The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored.
-    required: false
+    required: true
+    
+outputs:
+  identified-issues:
+    description: Issues found in JIra using the 'jql-query' or 'issues' input.
+    value: ${{ steps.transition.outputs.identifiedIssues }}
+    
+  transitioned-issues:
+    description: Issues successfully transitioned.
+    value: ${{ steps.transition.outputs.transitionedIssues }}
+  
+  failed-issues:
+    description: Issues that where not successfully transitioned which where identified.
+    value: ${{ steps.transition.outputs.failedIssues }}
+    
+  failed-issues-not-found:
+    description: Issues that were not found from the 'issues' input as JSON.
+    value: ${{ steps.transition.outputs.notfoundIssues }}
+    
+  identified-issues-as-json:
+    description: Issues found in JIra using the 'jql-query' or 'issues' input as JSON.
+    value: ${{ steps.transition.outputs.identifiedIssuesAsJson }}
+
+  transitioned-issues-as-json:
+    description: Issues successfully transitioned as JSON output..
+    value: ${{ steps.transition.outputs.transitionedIssuesAsJson }}
+
+  failed-issues-as-json:
+    description: Issues that where not successfully transitioned which where identified as JSON.
+    value: ${{ steps.transition.outputs.failedIssuesAsJson }}
+
+  failed-issues-not-found-as-json:
+    description: Issues that were not found from the 'issues' input as JSON.
+    value: ${{ steps.transition.outputs.notfoundIssuesAsJson }}
 
 runs:
   using: 'composite'
   steps:
     - name: Transition Jira Tickets
+      id: transition
       shell: pwsh
       env:
         FIELDS: ${{ inputs.overwrite-fields }}
         UPDATES: ${{ inputs.process-operations }}
       run: |
-        [System.Security.SecureString] $securePassword = if(!!"${{ inputs.jira-password }}") { ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force } Else { $null }
+        If ([string]::IsNullOrEmpty("${{ inputs.jira-username }}")) {
+          Write-Output "::error::Jira username is required"
+          exit 1
+        }
+        
+        If ([string]::IsNullOrEmpty("${{ inputs.jira-password }}")) {
+          Write-Output "::error::Jira password is required"
+          exit 1
+        }
+        
+        Write-Output "::add-mask::${{ inputs.jira-password }}"
+        [System.Security.SecureString] $securePassword = ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force
         
         $JqlToQueryBy = "${{ inputs.jql-query }}".Trim()
         $IssueList = "${{ inputs.issues }}".Trim()
         
-        If ([string]::IsNullOrEmpty($JqlToQueryBy) -And [string]::IsNullOrEmpty($IssueList)) {
-          Write-Output "::error::Either 'jql-query' or 'issues' input are required"
-          exit 1
-        }
-        
         $IssueKeys = @($issueList -split "\n") -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
         $Fields = $env:FIELDS | ConvertFrom-Json -AsHashtable
         $Updates = $env:UPDATES | ConvertFrom-Json -AsHashtable
-
+        
         ${{ github.action_path }}/src/transition-jira-tasks.ps1 `
           -JiraDomain "${{ inputs.domain-name }}" `
           -JqlToQueryBy $JqlToQueryBy `
-          -IssueKeys $IssueKeys
+          -IssueKeys $IssueKeys `
           -TransitionName "${{ inputs.transition-name }}" `
-          -Fields $Fields
-          -Updates $Updates
+          -Fields $Fields `
+          -Updates $Updates `
           -Comment "${{ inputs.comment }}" `
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword `
-          -FailIfNoTransitionedIssues:$${{ (inputs.fail-if-issues-not-transitioned == 'true' && 'true') || 'false' }} 
-          -FailIfNotFoundIssues:$${{ (inputs.fail-if-issues-not-found == 'true' && 'true') || 'false' }} 
+          -FailIfNoTransitionedIssues:$${{ (inputs.fail-if-issues-not-transitioned == 'true' && 'true') || 'false' }} `
+          -FailIfNotFoundIssues:$${{ (inputs.fail-if-issues-not-found == 'true' && 'true') || 'false' }} `
           -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 

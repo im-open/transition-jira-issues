@@ -82,23 +82,28 @@ If you are unsure what field names to use, run the [Get-Jira-Issue](../main/Test
 
 > See [Atlassian Edit Issues Example](https://developer.atlassian.com/server/jira/platform/jira-rest-api-example-edit-issues-6291632/) for additional help
 
+### Field specificity
+If a field only exists on a certain issue type, you can specify the type as part of the declaration using `issueType` as a single value or an array.  If not specified, will be applied to all issue types.
+
 ### Overwrite Fields Input
 The easiest solution is to pass `overwrite-fields` input with static changes. These must be screen fields -- fields that a user can edit in Jira on the specific issue type.  If the field doesn't exist on the issue type, it will be ignored.
 
 _The `overwrite-fields` input would be something like:_
 
 ```json
-"fields": {
+{
     "assignee": {
-      "name": "bob"
+      "name": "bob",
+      "issueType": "Story"
     },
     "resolution": {
-      "name": "Fixed"
+      "name": "Fixed",
+      "issueType": ["Bug", "Story"]
     },
     "customfield_40000": {
       "value": "red"
     }
-  }
+}
 ```
 
 ### Update Operations Input
@@ -108,8 +113,20 @@ Update fields by operations. Like adding a comment, creating a link to another t
 _The `updates` fields would be something like:_
 
 ```json
-"update" : {
-  "components" : [{"remove" : {"name" : "Trans/A"}}, {"add" : {"name" : "Trans/M"}}]
+{
+  "components" : [
+    {
+      "issueType": "Bug",
+      "remove" : {
+        "name" : "Trans/A"
+      }
+    }, 
+    {
+      "add" : {
+        "name" : "Trans/M"
+      }
+    }
+  ]
 }
 ```
 

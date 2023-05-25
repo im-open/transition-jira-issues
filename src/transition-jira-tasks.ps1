@@ -24,6 +24,7 @@ $MESSAGE_TITLE = "Jira Ticket Transitions"
 
 $env:GITHUB_RUNNER_URL = "{0}/{1}/actions/runs/{2}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_RUN_ID 
 $env:GITHUB_JOB_URL = "{0}/jobs/{1}" -f $env:GITHUB_RUNNER_URL, $env:GITHUB_JOB
+$env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_ACTION_REPOSITORY
 
 $throttleLimit = $env:ACTIONS_STEP_DEBUG -ieq "true" ? 1 : 5
 
@@ -89,7 +90,8 @@ try {
       } 
     } -ThrottleLimit $throttleLimit 
 
-    $identifiedIssueKeys = $processedIssues.Keys
+    # Don't flattern the array
+    $identifiedIssueKeys = @($processedIssues.Keys)
     $transitionedIssueKeys = $processedIssues.ToArray() | Where-Object { $_.Value -eq $true } | ForEach-Object { $_.Key }
     $failedIssueKeys = $identifiedIssueKeys | Where-Object { $transitionedIssueKeys -notcontains $_ }
     $notFoundIssueKeys = $IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }
@@ -100,25 +102,25 @@ try {
     Write-Information "Not found issues: $($notFoundIssueKeys -join ', ')"
 
     # Outputs
-    "identified-issues=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
-    "identified-issues-as-json=$($identifiedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+    "identifiedIssues=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+    "identifiedIssuesAsJson=$($identifiedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 
-    "transitioned-issues=$($transitionedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
-    "transitioned-issues-as-json=$($transitionedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+    "transitionedIssues=$($transitionedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+    "transitionedIssuesAsJson=$($transitionedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 
-    "failed-issues=$($failedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
-    "failed-issues-as-json=$($failedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+    "failedIssues=$($failedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+    "failedIssuesAsJson=$($failedIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 
-    "notfound-issues=$($notFoundIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
-    "notfound-issues-as-json=$($notFoundIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
+    "notfoundIssues=$($notFoundIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
+    "notfoundIssuesAsJson=$($notFoundIssueKeys | ConvertTo-Json -Compress)" >> $env:GITHUB_OUTPUT
 
     If ($identifiedIssueKeys.Length -eq 0 -And $FailIfNoTransitionedIssues) {
-        Write-Output "::error title=$MESSAGE_TITLE::No issues were found that matched query [$JqlToQueryBy]"
+        Write-Output "::error title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
         exit 1
     }
 
     If ($identifiedIssueKeys.Length -eq 0 -And !$FailIfNoTransitionedIssues) {
-        Write-Output "::warning title=$MESSAGE_TITLE::No issues were found that matched query [$JqlToQueryBy]"
+        Write-Output "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
         return
     }
 
@@ -132,16 +134,16 @@ try {
     }
 
     If ($notFoundIssueKeys.Length -gt 0 -And $FailIfNotFoundIssues) {
-        Write-Output "::error title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') are not found in Jira using query {$JqlToQueryBy}"
+        Write-Output "::error title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
         exit 1
     }
 
     If ($notFoundIssueKeys.Length -gt 0 -And !$FailIfNotFoundIssues) {
-        Write-Output "::warning title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') are not found in Jira using query {$JqlToQueryBy}"
+        Write-Output "::warning title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
     }
 
     If ($transitionedIssueKeys.Length -gt 0) {
-        Write-Output "::notice title=$MESSAGE_TITLE::$($transitionedIssueKeys -join ', ') were successfully transitioned to [$TransitionName]"
+        Write-Output "::notice title=$MESSAGE_TITLE::$($transitionedIssueKeys -join ', ') successfully transitioned to [$TransitionName]"
     }
 }
 finally {

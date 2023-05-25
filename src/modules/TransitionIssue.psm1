@@ -37,7 +37,13 @@ function Invoke-JiraTransitionTicket {
 
     $issueKey = $Issue.key
     $issueUri = $Issue.self
+    $issueType = $Issue.fields.issuetype.name
+    $issueSummary = $Issue.fields.summary
     $issueStatus = $Issue.fields.status.name
+    $issueLabels = $Issue.fields.labels
+    $issueComponents = $Issue.fields.components
+    
+    Write-Debug "[$issueKey] $issueType : $issueSummary -> processing with labels [$($issueLabels -join ', ')] and components [$(@($issueComponents | Select-Object -ExpandProperty name) -join ', ')]" 
     
     $transitions = Get-JiraTransitionsByIssue `
       -IssueUri $issueUri `
@@ -52,15 +58,15 @@ function Invoke-JiraTransitionTicket {
     }
 
     If ($issueStatus -ieq $TransitionName) {
-      "[$issueKey] Issue already in status [$issueStatus] Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
-        | Write-Information
+      "[$issueKey] $issueType already in status [$issueStatus] Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+        | Write-Warning
 
       return $true
     }
 
     $transitionId = $transitionIdLookup[$TransitionName]
     If ($null -eq $transitionId) {
-        "[$issueKey] Unable to perform transition [$TransitionName] on issue! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+        "[$issueKey] Unable to perform transition [$TransitionName] on $issueType in [$issueStatus]! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
           | Write-Warning 
 
         return $false
@@ -76,8 +82,8 @@ function Invoke-JiraTransitionTicket {
 
         $unavailableFields = $Fields.Keys | Where-Object { $availableFields.Keys -cnotcontains $_ } 
 
-        If ($availableFields.Length -eq 0) {
-          "[$issueKey] No valid fields were identified for the issue (they are case-sensitive). No field changes will be applied." `
+        If (!$availableFields -Or $availableFields.Length -eq 0) {
+          "[$issueKey] No valid fields were identified for $issueType (they are case-sensitive). No field changes will be applied." `
             | Write-Warning
 
           return $false
@@ -89,7 +95,7 @@ function Invoke-JiraTransitionTicket {
         }
     }
 
-    Write-Information "[$issueKey] Transitioning issue from [$issueStatus] to [$TransitionName]..."
+    Write-Information "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
 
     return Push-JiraTicketTransition `
       -IssueUri $issueUri `
