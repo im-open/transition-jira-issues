@@ -20,7 +20,7 @@ function New-Comment {
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
 function Invoke-JiraTransitionTicket {
-    [OutputType([boolean])]
+    [OutputType([bool])]
     Param (
         [hashtable]$AuthorizationHeaders,
         [PSCustomObject]$Issue,
@@ -28,18 +28,21 @@ function Invoke-JiraTransitionTicket {
         [hashtable]$Fields = @{},
         [hashtable]$Updates = @{},
         [string]$Comment = "",
-        [boolean]$FailIfJiraInaccessible = $false
+        [bool]$FailIfJiraInaccessible = $false
     );
 
     If ([string]::IsNullOrEmpty($TransitionName)) {
-      throw "Transition Name is null or missing" 
+      throw "Transition name is null or missing" 
     }
 
     $issueKey = $Issue.key
     $issueUri = $Issue.self
     $issueStatus = $Issue.fields.status.name
     
-    $transitions = Get-JiraTransitionsByIssue -IssueUri $issueUri -AuthorizationHeaders $AuthorizationHeaders -IncludeDetails $true
+    $transitions = Get-JiraTransitionsByIssue `
+      -IssueUri $issueUri `
+      -AuthorizationHeaders $AuthorizationHeaders `
+      -IncludeDetails $true
 
     # Include status names with possible transitions
     $transitionIdLookup = @{}
@@ -49,39 +52,44 @@ function Invoke-JiraTransitionTicket {
     }
 
     If ($issueStatus -ieq $TransitionName) {
-      Write-Information "Issue [$issueKey] is already in status [$issueStatus]. Skipping transition to [$TransitionName]..."
-      Write-Information "Available transitions: $($transitionIdLookup.Keys -join ', ')"
+      "[$issueKey] Issue s already in status [$issueStatus]! Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+        | Write-Information
+
       return $true
     }
 
     $transitionId = $transitionIdLookup[$TransitionName]
     If ($null -eq $transitionId) {
-        # TODO: Write to github notice
-        Write-Warning "Unable to perform transition [$TransitionName] on issue [$issueKey]. Available transitions: $($transitionIdLookup.Keys -join ', ')"
+        "[$issueKey] Unable to perform transition [$TransitionName] on issue! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+          | Write-Warning 
+
         return $false
     }
 
     $availableFields = @{}
     if ($Fields.Count -gt 0) {
-        $issueFieldNames = $Issue.fields.psobject.Properties.Name | ForEach-Object { $_.toLower() } 
+        $issueFieldNames = $Issue.fields.psobject.Properties.Name
 
         $availableFields = $Fields.GetEnumerator() | ForEach-Object -Begin { $accumulator = @{} } `
-          -Process { if ($issueFieldNames -contains $_.Key.ToLower()) { $accumulator[$_.Key] = $_.Value } } `
+          -Process { if ($issueFieldNames -ccontains $_.Key) { $accumulator[$_.Key] = $_.Value } } `
           -End { $accumulator }
 
-        $unavailableFields = $Fields.Keys | Where-Object { $availableFields.Keys -notcontains $_.ToLower() } 
+        $unavailableFields = $Fields.Keys | Where-Object { $availableFields.Keys -cnotcontains $_ } 
 
         If ($availableFields.Length -eq 0) {
-          Write-Warning "No valid fields were identified for the issue [$issueKey]"
+          "[$issueKey] No valid fields were identified for the issue (they are case-sensitive). No field changes will be applied." `
+            | Write-Warning
+
           return $false
         }
 
         If ($unavailableFields.Count -gt 0) {
-            Write-Warning "The following fields were omitted because they are not valid for the issue [$issueKey]: $($unavailableFields -join ', ')"
+            "[$issueKey] Fields were omitted because they are not valid for the issue (they are case-sensitive): $($unavailableFields -join ', ')" `
+              | Write-Warning
         }
     }
 
-    Write-Information "Transitioning issue [$issueKey] from [$issueStatus] to [$TransitionName]..."
+    Write-Information "[$issueKey] Transitioning issue from [$issueStatus] to [$TransitionName]..."
 
     return Push-JiraTicketTransition `
       -IssueUri $issueUri `

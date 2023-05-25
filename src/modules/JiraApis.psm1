@@ -18,6 +18,7 @@ function Get-AuthorizationHeaders {
 
     # Prepare the Basic Authorization header - PSCredential doesn't seem to work
     $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $Username, $plainPassword)))
+
     return @{Authorization = ("Basic {0}" -f $base64AuthInfo) }
 }
 
@@ -31,7 +32,7 @@ function Invoke-JiraApi {
         [bool]$FailOnRequestFailure = $true
     );
 
-    Write-Host "Invoking the Jira API at $($Uri.AbsoluteUri)"
+    Write-Information "Invoking the Jira API at $($Uri.AbsoluteUri)"
 
     $arguments = @{
       SkipHttpErrorCheck = $true
@@ -48,7 +49,8 @@ function Invoke-JiraApi {
       $result = Invoke-WebRequest @arguments
 
       If ($FailIfNotSuccessfulStatusCode -And ($result.StatusCode -lt 200 -Or $result.StatusCode -gt 299)) {
-          throw [System.Net.Http.HttpRequestException] "Failed getting Jira Issues with status code $($result.StatusCode) [$($result.StatusDescription)] and response $($result | ConvertTo-Json)"
+          throw [System.Net.Http.HttpRequestException] `
+            "Failed getting Jira Issues with status code $($result.StatusCode) [$($result.StatusDescription)] and response $($result | ConvertTo-Json)"
       }
 
       return [PSCustomObject]@{
@@ -75,6 +77,7 @@ function Get-JiraIssuesByQuery {
         [hashtable]$AuthorizationHeaders,
         [Uri]$BaseUri,
         [string]$Jql,
+        [int]$MaxResults = 20,
         [bool]$FailIfJiraInaccessible = $true
     );
 
@@ -83,11 +86,12 @@ function Get-JiraIssuesByQuery {
     }
 
     $queryParams = @{
-        maxResults = 20 
+        maxResults = $MaxResults
         jql = [System.Web.HttpUtility]::UrlEncode($Jql)
     }
     $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
-    $uri = New-Object -TypeName System.Uri -ArgumentList $BaseUri, ("/rest/api/2/search?$($queryParamsExpanded -join '&')")
+    $uri = New-Object -TypeName System.Uri -ArgumentList $BaseUri, `
+      ("/rest/api/2/search?$($queryParamsExpanded -join '&')")
 
     $result = Invoke-JiraApi -Uri $uri -AuthorizationHeaders $AuthorizationHeaders -FailOnRequestFailure $FailIfJiraInaccessible
 
@@ -101,12 +105,14 @@ function Get-JiraIssuesByQuery {
     return ,@($issues)
 }
 
+# https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-get
 function Get-JiraIssue {
   [OutputType([PSCustomObject])]
   Param (
       [hashtable]$AuthorizationHeaders,
       [Uri]$BaseUri,
       [string]$IssueKey,
+      [bool]$IncludeDetails = $true,
       [bool]$FailIfJiraInaccessible = $true
   );
 
@@ -114,7 +120,12 @@ function Get-JiraIssue {
     throw "Issue Key is null or missing" 
   }
 
-  $uri = New-Object -TypeName System.Uri -ArgumentList $BaseUri, "/rest/api/2/issue/$IssueKey"
+  $queryParams = @{
+    expand = $IncludeDetails ? "renderedFields,names,schema,transitions,editmeta,changelog" : ""
+  }
+  $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
+  $uri = New-Object -TypeName System.Uri -ArgumentList $BaseUri, `
+    ("/rest/api/2/issue/{0}?{1}" -f $IssueKey, ($queryParamsExpanded -join '&'))
 
   $result = Invoke-JiraApi `
     -Uri $uri `
@@ -127,7 +138,8 @@ function Get-JiraIssue {
   }
 
   If ($result.StatusCode -ne 200) {
-      throw [System.Net.Http.HttpRequestException] "Failed getting Jira Issue with status code [$($result.StatusCode)] and response $($result | ConvertTo-Json)"
+      throw [System.Net.Http.HttpRequestException] `
+        "Failed getting Jira Issue with status code [$($result.StatusCode)] and response $($result | ConvertTo-Json)"
   }
 
   return $result.Content
@@ -139,7 +151,7 @@ function Get-JiraTransitionsByIssue {
     Param (
         [hashtable]$AuthorizationHeaders,
         [Uri]$IssueUri,
-        [string]$IncludeDetails = $true
+        [bool]$IncludeDetails = $true
     );
 
     $queryParams = @{
@@ -161,7 +173,8 @@ function Get-JiraTransitionsByIssue {
     }
 
     If ($result.StatusCode -ne 200) {
-        throw [System.Net.Http.HttpRequestException] "Failed getting Jira Issue's transitions with status code [$($result.StatusCode)] and response $($result | ConvertTo-Json)"
+        throw [System.Net.Http.HttpRequestException] `
+          "Failed getting Jira Issue's transitions with status code [$($result.StatusCode)] and response $($result | ConvertTo-Json)"
     }
 
     # Do not flattern array if single item
@@ -170,7 +183,7 @@ function Get-JiraTransitionsByIssue {
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
 function Push-JiraTicketTransition {
-    [OutputType([boolean])]
+    [OutputType([bool])]
     Param (
         [hashtable]$AuthorizationHeaders = @{},
         [Uri]$IssueUri,
@@ -180,10 +193,9 @@ function Push-JiraTicketTransition {
         [bool]$FailIfJiraInaccessible = $false
     );
 
-    $urlToRun = "https://$Env:GITHUB_SERVER_URL/$Env:GITHUB_REPOSITORY/actions/runs/$Env:GITHUB_RUN_ID"
     $historyMetadata = @{
         activityDescription = "GitHub Transition"
-        description = "Status automatically updated via GitHub Actions. Link to the run: $urlToRun."
+        description = "Status automatically updated via GitHub Actions.$([string]::IsNullOrEmpty($env:GITHUB_RUNNER_URL) ? '' : " Link to the run: $env:GITHUB_RUNNER_URL")"
     }
 
     # "historyMetadata": {
@@ -235,7 +247,7 @@ function Push-JiraTicketTransition {
       Method = "Post"
     }
 
-    Write-Debug "Transition body: $($Body | ConvertTo-Json)"
+    Write-Host "Transition body: $($Body | ConvertFrom-Json | ConvertTo-Json)"
 
     $query = $IssueUri.AbsoluteUri + "/transitions"
     $uri = [System.Uri] $query
@@ -260,12 +272,14 @@ function Push-JiraTicketTransition {
     }
 
     If ($result.StatusCode -eq 400) {
-      Write-Warning "Unable to transition due to $($result.StatusDescription). See errors: $($result.Content | ConvertTo-Json)"
-      # TODO: Write to github notice
+      "Unable to transition due to $($result.StatusDescription). See errors: $($result.Content | ConvertTo-Json)" `
+        | Write-Warning
+
       return $false
     }
     
-    throw [System.Net.Http.HttpRequestException] "Failed transitioning issue with status code [$($result.StatusCode)] and response $($result | ConvertTo-Json)"
+    throw [System.Net.Http.HttpRequestException] `
+      "Failed transitioning issue with status code [$($result.StatusCode)] and response $($result | ConvertTo-Json)"
 }
 
 Export-ModuleMember -Function Push-JiraTicketTransition, Get-JiraTransitionsByIssue, Get-JiraIssuesByQuery, Get-JiraIssue, Invoke-JiraApi, Get-AuthorizationHeaders

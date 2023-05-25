@@ -57,13 +57,7 @@ try {
     -AuthorizationHeaders $authorizationHeaders `
     -FailIfJiraInaccessible $true
 
-  # TODO: merge with issues fields to show the display name of the field
-  # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-custom-field-contexts/#api-rest-api-3-field-fieldid-context-get
-  # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-fields/#api-rest-api-3-field-get
-
-  # TODO: get fields required by transition
-
-  if ($issue -eq $null) {
+  if ($null -eq $issue) {
     Write-Error "Issue [$IssueKey] not found"
     exit 1
   }

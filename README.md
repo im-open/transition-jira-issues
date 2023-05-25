@@ -22,7 +22,7 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 | `jql-query`                | conditionally* | The JQL query to use to find tickets that will be transitioned.                                                                                                                                                                  |
 | `issues`                   | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
 | `transition-name`          | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
-| `overwrite-fields`         | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. | 
+| `overwrite-fields`         | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. |
 | `process-operations`        | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
 | `comment`                  | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
 | `fail-if-issues-not-found` | false          |  Fail if no issues are found or no issues transitioned. _`false` by default._                                                                                                    |
@@ -86,7 +86,7 @@ The easiest solution is to pass `overwrite-fields` input with static changes. Th
 
 _The `overwrite-fields` input would be something like:_
 
-```
+```json
 "fields": {
     "assignee": {
       "name": "bob"
@@ -106,7 +106,7 @@ Update fields by operations. Like adding a comment, creating a link to another t
 
 _The `updates` fields would be something like:_
 
-```
+```json
 "update" : {
   "components" : [{"remove" : {"name" : "Trans/A"}}, {"add" : {"name" : "Trans/M"}}]
 }
