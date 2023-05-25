@@ -16,30 +16,31 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 
 ## Inputs
 
-| Parameter                  | Is Required    | Description                                                                                                                                                                                                                      |
-|----------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `domain-name`              | true           | The domain name for Jira.                                                                                                                                                                                                        |
-| `jql-query`                | conditionally* | The JQL query to use to find tickets that will be transitioned.                                                                                                                                                                  |
-| `issues`                   | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
-| `transition-name`          | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
-| `overwrite-fields`         | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. |
-| `process-operations`        | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
-| `comment`                  | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
-| `fail-if-issues-not-found` | false          |  Fail if no issues are found or no issues transitioned. _`false` by default._                                                                                                    |
-| `fail-if-jira-inaccessible` | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline. _`false` by default._                                                                                                       |
-| `jira-username`            | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
-| `jira-password`            | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
+| Parameter                         | Is Required    | Description                                                                                                                                                                                                                      |
+|-----------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `domain-name`                     | true           | The domain name for Jira.                                                                                                                                                                                                        |
+| `jql-query`                       | conditionally* | The JQL query to use to find tickets that will be transitioned. A max of 20 issues can be transitioned.                                                                                                                          |
+| `issues`                          | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
+| `transition-name`                 | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
+| `overwrite-fields`                | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. |
+| `process-operations`              | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
+| `comment`                         | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
+| `fail-if-issues-not-transitioned` | false          | Fail if some issues where not transitioned. _`true` by default._                                                                                                                                                                 |
+| `fail-if-issues-not-found`        | false          | Fail if some issues are not found. _`true` by default._                                                                                                                                                                          |
+| `fail-if-jira-inaccessible`       | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline. _`false` by default._                                                                                                       |
+| `jira-username`                   | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
+| `jira-password`                   | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
 
-<sup>*</sup> Either `jql-query` or `issues` input is required.  If both are provider, `jql-query` will be used.
+> <sup>*</sup> Either `jql-query` or `issues` input is required.  If both are provider, `jql-query` will be used.
 
 ## Outputs
 
-| Output                | Description                                                                             |
-|-----------------------|-----------------------------------------------------------------------------------------|
-| `identified-issues`    | Issues found in JIra using the `jql-query` or `issues` input.                           |
-| `transitioned-issues` | Issues successfully transitioned.                                                       |
-| `failed-issues`       | Issues that where not successfully transitioned which where identified.                 |
-| `notfound-issues`     | Issues that were not found from the `issues` input.                                     |
+| Output                | Description                                                             |
+|-----------------------|-------------------------------------------------------------------------|
+| `identified-issues`   | Issues found in JIra using the `jql-query` or `issues` input.           |
+| `transitioned-issues` | Issues successfully transitioned.                                       |
+| `failed-issues`       | Issues that where not successfully transitioned which where identified. |
+| `notfound-issues`     | Issues that were not found from the `issues` input.                     |
 
 ## Example
 

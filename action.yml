@@ -30,10 +30,15 @@ inputs:
     description: Add a comment to the ticket after the transition
     required: false
 
-  fail-if-issues-not-found:
-    description: Fail if no issues are found or no issues transitioned.
+  fail-if-issues-not-transitioned:
+    description: Fail if some issues where not transitioned.
     required: false
-    default: 'false'
+    default: 'true'
+
+  fail-if-issues-not-found:
+    description: Fail if some issues are not found.
+    required: false
+    default: 'true'
 
   fail-if-jira-inaccessible:
     description:  Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline.
@@ -81,5 +86,6 @@ runs:
           -Comment "${{ inputs.comment }}" `
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword `
-          -FailIfNoTransitionedIssues ${{ inputs.fail-if-issues-not-found }}
+          -FailIfNoTransitionedIssues ${{ inputs.fail-if-issues-not-transitioned }}
+          -FailIfNotFoundIssues ${{ inputs.fail-if-issues-not-found }}
           -FailIfJiraInaccessible ${{ inputs.fail-if-jira-inaccessible }}
