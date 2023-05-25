@@ -3,7 +3,7 @@ Import-Module (Join-Path $PSScriptRoot "JiraApis.psm1")
 function New-Comment {
     Param (
         [string]$Comment
-    );
+    )
 
     If ([string]::IsNullOrEmpty($Comment)) {
         return @{} 
@@ -29,7 +29,7 @@ function Invoke-JiraTransitionTicket {
         [hashtable]$Updates = @{},
         [string]$Comment = "",
         [bool]$FailIfJiraInaccessible = $false
-    );
+    )
 
     If ([string]::IsNullOrEmpty($TransitionName)) {
       throw "Transition name is null or missing" 
@@ -52,7 +52,7 @@ function Invoke-JiraTransitionTicket {
     }
 
     If ($issueStatus -ieq $TransitionName) {
-      "[$issueKey] Issue already in status [$issueStatus]! Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+      "[$issueKey] Issue already in status [$issueStatus] Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
         | Write-Information
 
       return $true

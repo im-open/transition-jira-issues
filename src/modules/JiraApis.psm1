@@ -3,7 +3,7 @@ function Get-AuthorizationHeaders {
     Param (
         [string]$Username,
         [securestring]$Password
-    );
+    )
 
     If ([string]::IsNullOrEmpty($Username)) {
         throw "Username is null or missing" 
@@ -30,7 +30,7 @@ function Invoke-JiraApi {
         [hashtable]$AuthorizationHeaders = @{},
         [bool]$FailIfNotSuccessfulStatusCode = $true,
         [bool]$FailOnRequestFailure = $true
-    );
+    )
 
     Write-Debug "Invoking the Jira API at $($Uri.AbsoluteUri)"
 
@@ -61,7 +61,7 @@ function Invoke-JiraApi {
     } 
     catch {
       if($_.Exception -is [System.Net.Http.HttpRequestException] -And !$FailOnRequestFailure) {
-          Write-Warning "Jira is inaccessible: $($_.Exception.Message)"
+          Write-Warning "Jira is inaccessible using Uri $($Uri): $($_.Exception.Message)"
           return $null 
       }
       Else {
@@ -79,7 +79,7 @@ function Get-JiraIssuesByQuery {
         [string]$Jql,
         [int]$MaxResults = 20,
         [bool]$FailIfJiraInaccessible = $true
-    );
+    )
 
     If ([string]::IsNullOrEmpty($Jql)) {
       throw "Jql is null or missing" 
@@ -92,7 +92,7 @@ function Get-JiraIssuesByQuery {
     $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
     $uri = New-Object -TypeName System.Uri -ArgumentList $BaseUri, `
       ("/rest/api/2/search?$($queryParamsExpanded -join '&')")
-
+    
     $result = Invoke-JiraApi -Uri $uri -AuthorizationHeaders $AuthorizationHeaders -FailOnRequestFailure $FailIfJiraInaccessible
 
     If ($null -eq $result) {
@@ -114,7 +114,7 @@ function Get-JiraIssue {
       [string]$IssueKey,
       [bool]$IncludeDetails = $true,
       [bool]$FailIfJiraInaccessible = $true
-  );
+  )
 
   If ([string]::IsNullOrEmpty($IssueKey)) {
     throw "Issue Key is null or missing" 
@@ -152,7 +152,7 @@ function Get-JiraTransitionsByIssue {
         [hashtable]$AuthorizationHeaders,
         [Uri]$IssueUri,
         [bool]$IncludeDetails = $true
-    );
+    )
 
     $queryParams = @{
       expand = $IncludeDetails ? "transitions.fields" : ""
@@ -191,64 +191,29 @@ function Push-JiraTicketTransition {
         [hashtable]$Fields = @{},
         [hashtable]$Updates = @{},
         [bool]$FailIfJiraInaccessible = $false
-    );
-
+    )
+    
+    $runnerUrl = [string]::IsNullOrEmpty($env:GITHUB_SERVER_URL) ? "" : "runner $env:GITHUB_RUNNER_URL"
     $historyMetadata = @{
-        type = "myplugin:type"
-        activityDescription = "GitHub Transition"
-        description = "Status automatically updated via GitHub Actions.$([string]::IsNullOrEmpty($env:GITHUB_RUNNER_URL) ? '' : " Link to the run: $env:GITHUB_RUNNER_URL")"
-        actor = @{
-          id = "github-actions"
-        }
-        generator = @{
-          id = "github-actions"
-          type = "mysystem-application"
-        }
-        cause = @{
-          id = "github-actions"
-          type = "mysystem-event"
-        }
+      activityDescription = "GitHub Workflow Transition"
+      description = "via GitHub Actions$runnerUrl"
+      type = "myplugin:type"
+      actor = @{
+        id = "github-actions"
+      }
+      generator = @{
+        id = "github-actions"
+        type = "github-application"
+      }
+      cause = @{
+        id = "github-actions"
+        type = "github-event"
       }
     }
 
-    # "historyMetadata": {
-    #   "activityDescription": "Complete order processing",
-    #   "actor": {
-    #     "avatarUrl": "http://mysystem/avatar/tony.jpg",
-    #     "displayName": "Tony",
-    #     "id": "tony",
-    #     "type": "mysystem-user",
-    #     "url": "http://mysystem/users/tony"
-    #   },
-    #   "cause": {
-    #     "id": "myevent",
-    #     "type": "mysystem-event"
-    #   },
-    #   "description": "From the order testing process",
-    #   "extraData": {
-    #     "Iteration": "10a",
-    #     "Step": "4"
-    #   },
-    #   "generator": {
-    #     "id": "mysystem-1",
-    #     "type": "mysystem-application"
-    #   },
-    #   "type": "myplugin:type"
-    # },
-    # "properties": [
-    #   {
-    #     "key": "key1",
-    #     "value": "Order number 10784"
-    #   },
-    #   {
-    #     "key": "key2",
-    #     "value": "Order number 10923"
-    #   }
-    # ],
-
     $body = @{
       transition = @{
-          id = $TransitionId
+        id = $TransitionId
       }
       fields = $Fields
       update = $Updates
@@ -285,7 +250,7 @@ function Push-JiraTicketTransition {
     }
 
     If ($result.StatusCode -eq 400) {
-      "Unable to transition due to $($result.StatusDescription). See errors: $($result.Content | ConvertTo-Json)" `
+      "Unable to transition issue [$IssueUri] due to $($result.StatusDescription). See errors: $($result.Content | ConvertTo-Json)" `
         | Write-Warning
 
       return $false

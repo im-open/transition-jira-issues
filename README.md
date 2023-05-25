@@ -26,8 +26,8 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 | `process-operations`              | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
 | `comment`                         | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
 | `fail-if-issues-not-transitioned` | false          | Fail if some issues where not transitioned. _`true` by default._                                                                                                                                                                 |
-| `fail-if-issues-not-found`        | false          | Fail if some issues are not found. _`true` by default._                                                                                                                                                                          |
-| `fail-if-jira-inaccessible`       | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline. _`false` by default._                                                                                                       |
+| `fail-if-issues-not-found`        | false          | Fail if some issues are not found that are listed in the `issues` input. _`true` by default._                                                                                                                                    |
+| `fail-if-jira-inaccessible`       | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is down but shouldn't block the pipeline. _`false` by default._                                                                                                       |
 | `jira-username`                   | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
 | `jira-password`                   | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
 
@@ -49,14 +49,14 @@ jobs:
   transition-jira-ticket:
     runs-on: ubuntu-20.04
     steps:
-      - name: 'Transition Jira Ticket to Deployed Status'
+      - name: Transition Jira Ticket to Deployed Status
         # You may also reference just the major or major.minor version
         uses: im-open/transition-jira-tasks-by-query@v2.0.0
         with:
-          jira-username: 'some-user'
-          jira-password: ${{ secrets.JIRA_USER_PASSWORD }}
-          domain-name: 'jira.com'
-          transition-name: 'Deployed'
+          jira-username: ${{ vars.JIRA_USERNAME }}
+          jira-password: ${{ secrets.JIRA_PASSWORD }}
+          domain-name: jira.com
+          transition-name: Deployed
           
           jql-query: 'issuekey=PROJ-12345'
           # jql-query: "filter='My Filter Name' AND issuekey=PROJ-12345"
@@ -126,7 +126,7 @@ When a pull request is created and there are changes to code-specific files and 
 
 - `action.yml`
 - `src/**`
-  There may be some instances where the bot does not have permission to push changes back to the branch though so this step should be done manually for those branches. See [Incrementing the Version](#incrementing-the-version) for more details.
+There may be some instances where the bot does not have permission to push changes back to the branch though so this step should be done manually for those branches. See [Incrementing the Version](#incrementing-the-version) for more details.
 
 ### Incrementing the Version
 

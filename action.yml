@@ -86,6 +86,6 @@ runs:
           -Comment "${{ inputs.comment }}" `
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword `
-          -FailIfNoTransitionedIssues ${{ inputs.fail-if-issues-not-transitioned }}
-          -FailIfNotFoundIssues ${{ inputs.fail-if-issues-not-found }}
-          -FailIfJiraInaccessible ${{ inputs.fail-if-jira-inaccessible }}
+          -FailIfNoTransitionedIssues:$${{ (inputs.fail-if-issues-not-transitioned == 'true' && 'true') || 'false' }} 
+          -FailIfNotFoundIssues:$${{ (inputs.fail-if-issues-not-found == 'true' && 'true') || 'false' }} 
+          -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 

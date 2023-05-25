@@ -8,9 +8,9 @@ param (
     [string]$JiraDomain = "jira.extendhealth.com",
     [string]$JiraUsername,
     [securestring]$JiraPassword,
-    [bool]$FailIfNoTransitionedIssues = $false,
-    [bool]$FailIfNotFoundIssues = $false,
-    [bool]$FailIfJiraInaccessible = $false
+    [switch]$FailIfNoTransitionedIssues = $false,
+    [switch]$FailIfNotFoundIssues = $false,
+    [switch]$FailIfJiraInaccessible = $false
 )
 
 $global:InformationPreference = "Continue"
@@ -46,7 +46,7 @@ try {
       -Jql $JqlToQueryBy `
       -AuthorizationHeaders $authorizationHeaders `
       -MaxResults $MAX_ISSUES_TO_TRANSITION `
-      -FailIfJiraInaccessible $true
+      -FailIfJiraInaccessible $FailIfJiraInaccessible
 
     If ($issues.Length -gt $MAX_ISSUES_TO_TRANSITION) {
       "Too many issues returned by the query [$($.issues.Length)]. Adjust the the query to return less than or equal to $MAX_ISSUES_TO_TRANSITION issues." `
