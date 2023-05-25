@@ -52,7 +52,7 @@ function Invoke-JiraTransitionTicket {
     }
 
     If ($issueStatus -ieq $TransitionName) {
-      "[$issueKey] Issue s already in status [$issueStatus]! Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+      "[$issueKey] Issue already in status [$issueStatus]! Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
         | Write-Information
 
       return $true

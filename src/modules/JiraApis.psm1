@@ -32,7 +32,7 @@ function Invoke-JiraApi {
         [bool]$FailOnRequestFailure = $true
     );
 
-    Write-Information "Invoking the Jira API at $($Uri.AbsoluteUri)"
+    Write-Debug "Invoking the Jira API at $($Uri.AbsoluteUri)"
 
     $arguments = @{
       SkipHttpErrorCheck = $true
@@ -194,8 +194,21 @@ function Push-JiraTicketTransition {
     );
 
     $historyMetadata = @{
+        type = "myplugin:type"
         activityDescription = "GitHub Transition"
         description = "Status automatically updated via GitHub Actions.$([string]::IsNullOrEmpty($env:GITHUB_RUNNER_URL) ? '' : " Link to the run: $env:GITHUB_RUNNER_URL")"
+        actor = @{
+          id = "github-actions"
+        }
+        generator = @{
+          id = "github-actions"
+          type = "mysystem-application"
+        }
+        cause = @{
+          id = "github-actions"
+          type = "mysystem-event"
+        }
+      }
     }
 
     # "historyMetadata": {
@@ -247,7 +260,7 @@ function Push-JiraTicketTransition {
       Method = "Post"
     }
 
-    Write-Host "Transition body: $($Body | ConvertFrom-Json | ConvertTo-Json)"
+    Write-Debug "Transition body: $($Body | ConvertFrom-Json | ConvertTo-Json)"
 
     $query = $IssueUri.AbsoluteUri + "/transitions"
     $uri = [System.Uri] $query

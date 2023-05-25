@@ -50,7 +50,7 @@ jobs:
     steps:
       - name: 'Transition Jira Ticket to Deployed Status'
         # You may also reference just the major or major.minor version
-        uses: im-open/transition-jira-tasks-by-query@v1.1.3
+        uses: im-open/transition-jira-tasks-by-query@v2.0.0
         with:
           jira-username: 'some-user'
           jira-password: ${{ secrets.JIRA_USER_PASSWORD }}

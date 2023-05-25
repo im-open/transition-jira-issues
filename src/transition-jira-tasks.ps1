@@ -9,6 +9,7 @@ param (
     [string]$JiraUsername,
     [securestring]$JiraPassword,
     [bool]$FailIfNoTransitionedIssues = $false,
+    [bool]$FailIfNotFoundIssues = $false,
     [bool]$FailIfJiraInaccessible = $false
 )
 
@@ -74,7 +75,8 @@ try {
               -Comment $using:Comment `
               -FailIfJiraInaccessible $safeFailIfJiraInaccessible 
 
-            $safeProcessedIssues.TryAdd($issue.key, $result)
+            $added = $safeProcessedIssues.TryAdd($issue.key, $result)
+            Write-Debug "Added [$($issue.key)] to processed issues: $added"
       }
       catch {
           $safeProcessedIssues.TryAdd($issue.key, $false)
@@ -88,9 +90,14 @@ try {
     } -ThrottleLimit $throttleLimit 
 
     $identifiedIssueKeys = $processedIssues.Keys
-    $transitionedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $true } | Select-Object { $_.Key }
-    $failedIssueKeys = $processedIssues | Where-Object { $_.Value -eq $false } | Select-Object { $_.Key }
+    $transitionedIssueKeys = $processedIssues.ToArray() | Where-Object { $_.Value -eq $true } | ForEach-Object { $_.Key }
+    $failedIssueKeys = $identifiedIssueKeys | Where-Object { $transitionedIssueKeys -notcontains $_ }
     $notFoundIssueKeys = $IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }
+
+    Write-Information "Identified issues: $($identifiedIssueKeys -join ', ')"
+    Write-Information "Transitioned issues: $($transitionedIssueKeys -join ', ')"
+    Write-Information "Failed issues: $($failedIssueKeys -join ', ')"
+    Write-Information "Not found issues: $($notFoundIssueKeys -join ', ')"
 
     # Outputs
     "identified-issues=$($identifiedIssueKeys -join ', ')" >> $env:GITHUB_OUTPUT
@@ -111,21 +118,30 @@ try {
     }
 
     If ($identifiedIssueKeys.Length -eq 0 -And !$FailIfNoTransitionedIssues) {
-        Write-Output "::notice title=$MESSAGE_TITLE::No issues were found that matched query [$JqlToQueryBy]"
+        Write-Output "::warning title=$MESSAGE_TITLE::No issues were found that matched query [$JqlToQueryBy]"
         return
     }
 
-    If ($identifiedIssueKeys.Length -eq 0 -And !$FailIfNoTransitionedIssues) {
-        Write-Output "::warning title=$MESSAGE_TITLE::The issues [$($failedIssueKeys -join ', ')] are not found in Jira with matching query [$JqlToQueryBy]"
-    }
-
     If ($failedIssueKeys.Length -gt 0 -And $FailIfNoTransitionedIssues) {
-        Write-Output "::error title=$MESSAGE_TITLE::Failed to transition issues [$($failedIssueKeys -join ', ')] with matching query [$JqlToQueryBy]. You might need to include the update of a missing field value. See logs for details. $env:GITHUB_JOB_URL"
+        Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $($failedIssueKeys -join ', ') to [$TransitionName]. You might need to include the update of a missing field value. See logs for details: $env:GITHUB_JOB_URL"
         exit 1
     }
 
     If ($failedIssueKeys.Length -gt 0 -And !$FailIfNoTransitionedIssues) {
-        Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition issues [$($failedIssueKeys -join ', ')] with matching query [$JqlToQueryBy]. You might need to include the update of a missing field value. See logs for details. $env:GITHUB_JOB_URL"
+        Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $($failedIssueKeys -join ', ') to [$TransitionName]. You might need to include the update of a missing field value. See logs for details: $env:GITHUB_JOB_URL"
+    }
+
+    If ($notFoundIssueKeys.Length -gt 0 -And $FailIfNotFoundIssues) {
+        Write-Output "::error title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') are not found in Jira using query {$JqlToQueryBy}"
+        exit 1
+    }
+
+    If ($notFoundIssueKeys.Length -gt 0 -And !$FailIfNotFoundIssues) {
+        Write-Output "::warning title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') are not found in Jira using query {$JqlToQueryBy}"
+    }
+
+    If ($transitionedIssueKeys.Length -gt 0) {
+        Write-Output "::notice title=$MESSAGE_TITLE::$($transitionedIssueKeys -join ', ') were successfully transitioned to [$TransitionName]"
     }
 }
 finally {
