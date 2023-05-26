@@ -1,3 +1,5 @@
+using module "./src/modules/TransitionIssue.psm1"
+
 <#
   .SYNOPSIS
   Transition Jira Issue. 
@@ -29,7 +31,6 @@
   .EXAMPLE
   PS> .\Test-Transition-Jira-Issue.ps1 -issue ABC-1234 -transition "In Progress" -username Joe -password 1234
 #>
-
 param (
     [Alias("issue")]
     [string]$IssueKey,
@@ -58,10 +59,12 @@ param (
 $global:InformationPreference = "Continue"
 $ErrorActionPreference = "Stop"
 
-Import-Module (Join-Path $PSScriptRoot "src" "modules" "JiraApis.psm1")
-Import-Module (Join-Path $PSScriptRoot "src" "modules" "TransitionIssue.psm1")
+$modulesPath = Join-Path $PSScriptRoot "src" "modules"
 
 try {
+  Import-Module (Join-Path $modulesPath "JiraApis.psm1")
+  Import-Module (Join-Path $modulesPath "TransitionIssue.psm1")
+
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
   $baseUri = New-Object -TypeName System.Uri -ArgumentList $JiraBaseUri
   $authorizationHeaders = Get-AuthorizationHeaders -Username $Username -Password $securePassword 
@@ -72,7 +75,7 @@ try {
     -AuthorizationHeaders $authorizationHeaders `
     -FailIfJiraInaccessible $true
 
-  if ($issues.Length -eq 0) {
+  If ($issues.Length -eq 0) {
     Write-Error "Issue [$IssueKey] not found"
     exit 1
   }
@@ -86,12 +89,12 @@ try {
     -AuthorizationHeaders $authorizationHeaders `
     -FailIfJiraInaccessible $true
 
-  if (!$result) {
-    Write-Error "Failed to transition ticket to the state $TransitionName"
+  If ($result -ne [TransitionResultType]::Success) {
+    Write-Error "Failed to transition ticket to the state [$TransitionName] with a result of [$result]"
     exit 1
   }
     
-  Write-Information "Successfully transitioned ticket to state $TransitionName"
+  Write-Information "Successfully transitioned ticket to state [$TransitionName] with a result of [$result]"
 }
 finally {
   Remove-Module JiraApis

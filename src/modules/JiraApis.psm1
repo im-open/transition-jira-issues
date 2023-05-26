@@ -1,3 +1,5 @@
+$JIRA_HELP_URL = "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post"
+
 function Get-AuthorizationHeaders {
     [OutputType([hashtable])]
     Param (
@@ -234,14 +236,14 @@ function Push-JiraTicketTransition {
       fields = $Fields
       update = $Updates
       historyMetadata = $historyMetadata
-    } | ConvertTo-Json -Compress
+    } | ConvertTo-Json -Depth 5 -Compress
 
     $arguments = @{
       Body = $Body
       Method = "Post"
     }
 
-    Write-Debug "Transition body: $($Body | ConvertFrom-Json | ConvertTo-Json)"
+    "Transition body: $($Body | ConvertFrom-Json | ConvertTo-Json -Depth 5)" | Write-Debug
 
     $query = $IssueUri.AbsoluteUri + "/transitions"
     $uri = [System.Uri] $query
@@ -266,8 +268,8 @@ function Push-JiraTicketTransition {
     }
 
     If ($result.StatusCode -eq 400) {
-      if ($result.Content.errorMessages.Length -eq 0) {
-        $result.Content.errorMessages = "Transition Error. See $env:GITHUB_ACTION_URL for help."
+      If ($result.Content.errorMessages.Length -eq 0) {
+        $result.Content.errorMessages = "Transition Error. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
       }
       
       "Unable to transition issue [$IssueUri] due to $($result.StatusDescription). See errors: $($result.Content | ConvertTo-Json)" `

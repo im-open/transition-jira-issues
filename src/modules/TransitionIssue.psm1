@@ -4,23 +4,33 @@ function New-Comment {
     Param (
         [string]$Comment
     )
-
+    
     If ([string]::IsNullOrEmpty($Comment)) {
         return @{} 
     }
 
-    return @(
-      comment = @{
-        add = @{
+    return @{
+      comment = @(
+        @{
+          add = @{
             body = $Comment
+          }
         }
-      }
-    )
+      )
+    }
+}
+
+Enum TransitionResultType {
+  Unknown
+  Unavailable
+  Success
+  Failed
+  Skipped
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
 function Invoke-JiraTransitionTicket {
-    [OutputType([bool])]
+    [OutputType([TransitionResultType])]
     Param (
         [hashtable]$AuthorizationHeaders,
         [PSCustomObject]$Issue,
@@ -45,6 +55,7 @@ function Invoke-JiraTransitionTicket {
     
     Write-Debug "[$issueKey] $issueType : $issueSummary -> processing with labels [$($issueLabels -join ', ')] and components [$(@($issueComponents | Select-Object -ExpandProperty name) -join ', ')]" 
     
+    # TODO: include transition IDs
     $transitions = Get-JiraTransitionsByIssue `
       -IssueUri $issueUri `
       -AuthorizationHeaders $AuthorizationHeaders `
@@ -58,26 +69,34 @@ function Invoke-JiraTransitionTicket {
     }
 
     If ($issueStatus -ieq $TransitionName) {
-      "[$issueKey] $issueType already in status [$issueStatus] Skipping transition... Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+      "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
         | Write-Warning
 
-      return $true
+      return [TransitionResultType]::Skipped 
     }
 
     $transitionId = $transitionIdLookup[$TransitionName]
     If ($null -eq $transitionId) {
-        "[$issueKey] Unable to perform transition [$TransitionName] on $issueType in [$issueStatus]! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+        "[$issueKey] Missing transition [$TransitionName] on $issueType! Current in [$issueStatus] state. Available transitions: $($transitionIdLookup.Keys -join ', ')" `
           | Write-Warning 
 
-        return $false
+        return [TransitionResultType]::Unavailable
     }
 
     $availableFields = @{}
-    if ($Fields.Count -gt 0) {
+    If ($Fields.Count -gt 0) {
+        
+        #TODO: Include field IDs and key names
         $issueFieldNames = $Issue.fields.psobject.Properties.Name
 
         $availableFields = $Fields.GetEnumerator() | ForEach-Object -Begin { $accumulator = @{} } `
-          -Process { if ($issueFieldNames -ccontains $_.Key) { $accumulator[$_.Key] = $_.Value } } `
+          -Process { 
+            If ($issueFieldNames -ccontains $_.Key) { $accumulator[$_.Key] = $_.Value }
+
+            # TODO: filter fields if they are not valid for the issue type
+#            If ($_.Value.issueType -eq $null -Or $_.Value.issueType -ieq $issueType -Or $_.Value.issueType -is [array] -And $_.Value.issueType -icontains $issueType ) { $accumulator[$_.Key] = $_.Value }
+            
+          } `
           -End { $accumulator }
 
         $unavailableFields = $Fields.Keys | Where-Object { $availableFields.Keys -cnotcontains $_ } 
@@ -85,8 +104,6 @@ function Invoke-JiraTransitionTicket {
         If (!$availableFields -Or $availableFields.Length -eq 0) {
           "[$issueKey] No valid fields were identified for $issueType (they are case-sensitive). No field changes will be applied." `
             | Write-Warning
-
-          return $false
         }
 
         If ($unavailableFields.Count -gt 0) {
@@ -95,15 +112,19 @@ function Invoke-JiraTransitionTicket {
         }
     }
 
+    # TODO: filter updates if they are not valid for the issue type: 1) fields exists, 2) field is valid for issue type
+
     Write-Information "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
 
-    return Push-JiraTicketTransition `
+    $result = Push-JiraTicketTransition `
       -IssueUri $issueUri `
       -TransitionId $transitionId `
       -Fields $availableFields `
       -Updates (New-Comment $Comment) + $Updates `
       -AuthorizationHeaders $AuthorizationHeaders `
       -FailIfJiraInaccessible $FailIfJiraInaccessible
+    
+    return $result ? [TransitionResultType]::Success : [TransitionResultType]::Failed
 }
 
 Export-ModuleMember -Function Invoke-JiraTransitionTicket

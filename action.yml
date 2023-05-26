@@ -30,12 +30,17 @@ inputs:
     description: Add a comment to the ticket after the transition
     required: false
 
-  fail-if-issues-not-transitioned:
+  missing-transition-as-successful:
+    description: Mark as a successful if issue is missing the transition.
+    required: false
+    default: 'true'
+      
+  fail-if-issue-not-transitioned:
     description: Fail if some issues where not transitioned.
     required: false
     default: 'true'
-
-  fail-if-issues-not-found:
+    
+  fail-if-issue-not-found:
     description: Fail if some issues are not found.
     required: false
     default: 'true'
@@ -58,33 +63,25 @@ outputs:
     description: Issues found in JIra using the 'jql-query' or 'issues' input.
     value: ${{ steps.transition.outputs.identifiedIssues }}
     
+  processed-issues:
+    description: Issues successfully transitioned, skipped or (if enabled) unavailable.
+    value: ${{ steps.transition.outputs.processedIssues }}
+    
   transitioned-issues:
     description: Issues successfully transitioned.
     value: ${{ steps.transition.outputs.transitionedIssues }}
+    
+  unavailable-issues:
+    description: Issues missing the specificed transition.
+    value: ${{ steps.transition.outputs.unavailableTransitionIssue }}
   
   failed-issues:
-    description: Issues that where not successfully transitioned which where identified.
+    description: Issues identified but not successfully processed.
     value: ${{ steps.transition.outputs.failedIssues }}
     
-  failed-issues-not-found:
-    description: Issues that were not found from the 'issues' input as JSON.
+  not-found-issues:
+    description: Issues not found.
     value: ${{ steps.transition.outputs.notfoundIssues }}
-    
-  identified-issues-as-json:
-    description: Issues found in JIra using the 'jql-query' or 'issues' input as JSON.
-    value: ${{ steps.transition.outputs.identifiedIssuesAsJson }}
-
-  transitioned-issues-as-json:
-    description: Issues successfully transitioned as JSON output..
-    value: ${{ steps.transition.outputs.transitionedIssuesAsJson }}
-
-  failed-issues-as-json:
-    description: Issues that where not successfully transitioned which where identified as JSON.
-    value: ${{ steps.transition.outputs.failedIssuesAsJson }}
-
-  failed-issues-not-found-as-json:
-    description: Issues that were not found from the 'issues' input as JSON.
-    value: ${{ steps.transition.outputs.notfoundIssuesAsJson }}
 
 runs:
   using: 'composite'
@@ -126,6 +123,7 @@ runs:
           -Comment "${{ inputs.comment }}" `
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword `
-          -FailIfNoTransitionedIssues:$${{ (inputs.fail-if-issues-not-transitioned == 'true' && 'true') || 'false' }} `
-          -FailIfNotFoundIssues:$${{ (inputs.fail-if-issues-not-found == 'true' && 'true') || 'false' }} `
+          -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
+          -FailIfNoTransitionedIssues:$${{ (inputs.fail-if-issue-not-transitioned == 'true' && 'true') || 'false' }} `
+          -FailIfNotFoundIssues:$${{ (inputs.fail-if-issue-not-found == 'true' && 'true') || 'false' }} `
           -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 

@@ -44,9 +44,9 @@ param (
 $global:InformationPreference = "Continue"
 $ErrorActionPreference = "Stop"
 
-Import-Module (Join-Path $PSScriptRoot "src" "modules" "JiraApis.psm1")
-
 try {
+  Import-Module (Join-Path $PSScriptRoot "src" "modules" "JiraApis.psm1")
+  
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
   $baseUri = New-Object -TypeName System.Uri -ArgumentList $JiraBaseUri
   $authorizationHeaders = Get-AuthorizationHeaders -Username $Username -Password $securePassword 
@@ -57,13 +57,13 @@ try {
     -AuthorizationHeaders $authorizationHeaders `
     -FailIfJiraInaccessible $true
 
-  if ($null -eq $issue) {
+  If ($null -eq $issue) {
     Write-Error "Issue [$IssueKey] not found"
     exit 1
   }
 
   $issue | ConvertTo-Json -Depth 10 | Write-Output
-  Set-Content -Path "./issues.json" -Value ($issue | ConvertTo-Json -Depth 10)
+  Set-Content -Path "./issues.json" -Value ($issue | ConvertTo-Json -Depth 5)
 }
 finally {
   Remove-Module JiraApis
