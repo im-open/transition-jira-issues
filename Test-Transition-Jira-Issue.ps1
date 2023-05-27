@@ -1,3 +1,4 @@
+using module "./src/modules/JiraApis.psm1"
 using module "./src/modules/TransitionIssue.psm1"
 
 <#
@@ -59,12 +60,7 @@ param (
 $global:InformationPreference = "Continue"
 $ErrorActionPreference = "Stop"
 
-$modulesPath = Join-Path $PSScriptRoot "src" "modules"
-
 try {
-  Import-Module (Join-Path $modulesPath "JiraApis.psm1")
-  Import-Module (Join-Path $modulesPath "TransitionIssue.psm1")
-
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
   $baseUri = New-Object -TypeName System.Uri -ArgumentList $JiraBaseUri
   $authorizationHeaders = Get-AuthorizationHeaders -Username $Username -Password $securePassword 
@@ -73,7 +69,6 @@ try {
     -BaseUri $baseUri `
     -Jql "key = $IssueKey" `
     -AuthorizationHeaders $authorizationHeaders `
-    -FailIfJiraInaccessible $true
 
   If ($issues.Length -eq 0) {
     Write-Error "Issue [$IssueKey] not found"
@@ -87,7 +82,6 @@ try {
     -Updates $Updates `
     -Comment $Comment `
     -AuthorizationHeaders $authorizationHeaders `
-    -FailIfJiraInaccessible $true
 
   If ($result -ne [TransitionResultType]::Success) {
     Write-Error "Failed to transition ticket to the state [$TransitionName] with a result of [$result]"

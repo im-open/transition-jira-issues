@@ -1,5 +1,13 @@
 $JIRA_HELP_URL = "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post"
 
+class JiraInaccessibleException : System.Net.Http.HttpRequestException {
+  [Uri] $Uri
+  
+  JiraInaccessibleException([Uri]$Uri, [Exception]$inner) : base("Jira is inaccessible using Uri $Uri", $inner) {
+    $this.Uri = $Uri
+  }
+}
+
 function Get-AuthorizationHeaders {
     [OutputType([hashtable])]
     Param (
@@ -30,8 +38,7 @@ function Invoke-JiraApi {
         [Uri]$Uri,
         [hashtable]$AdditionalArguments = @{},
         [hashtable]$AuthorizationHeaders = @{},
-        [bool]$FailIfNotSuccessfulStatusCode = $true,
-        [bool]$FailOnRequestFailure = $true
+        [bool]$FailIfNotSuccessfulStatusCode = $true
     )
 
     Write-Debug "Invoking the Jira API at $($Uri.AbsoluteUri)"
@@ -43,13 +50,11 @@ function Invoke-JiraApi {
       Headers = $AuthorizationHeaders
     } + $AdditionalArguments
 
-    "Web Request arguments: $($arguments | ConvertTo-Json)" | Write-Debug
-
     $ProgressPreference = "SilentlyContinue"
     try {
       # https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_splatting
       $result = Invoke-WebRequest @arguments
-
+      
       If ($FailIfNotSuccessfulStatusCode -And ($result.StatusCode -lt 200 -Or $result.StatusCode -gt 299)) {
           throw [System.Net.Http.HttpRequestException] `
             "Failed getting Jira Issues with status code $($result.StatusCode) [$($result.StatusDescription)] and response $result"
@@ -61,14 +66,8 @@ function Invoke-JiraApi {
         Content = $result.StatusCode -eq 400 ? ($result | ConvertFrom-Json -AsHashTable) : ($result.Content | ConvertFrom-Json)
       }
     } 
-    catch {
-      if($_.Exception -is [System.Net.Http.HttpRequestException] -And !$FailOnRequestFailure) {
-          Write-Warning "Jira is inaccessible using Uri $($Uri): $($_.Exception.Message)"
-          return $null 
-      }
-      Else {
-          throw $_.Exception
-      }
+    catch [System.Net.Http.HttpRequestException] {
+        throw [JiraInaccessibleException]::new($Uri, $_.Exception)
     }
 }
 
@@ -80,12 +79,15 @@ function Get-JiraIssuesByQuery {
         [Uri]$BaseUri,
         [string]$Jql,
         [int]$MaxResults = 20,
-        [bool]$FailIfJiraInaccessible = $true
+        [bool]$IncludeDetails = $true
     )
 
     If ([string]::IsNullOrEmpty($Jql)) {
       throw "Jql is null or missing" 
     }
+    
+    #TODO: do not return fields, reference metadata instead?
+    #expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("transitions,editmeta") : ""
 
     $queryParams = @{
         maxResults = $MaxResults
@@ -99,15 +101,14 @@ function Get-JiraIssuesByQuery {
     $result = Invoke-JiraApi `
       -Uri $uri `
       -AuthorizationHeaders $AuthorizationHeaders `
-      -FailOnRequestFailure $FailIfJiraInaccessible `
       -FailIfNotSuccessfulStatusCode $false
 
-    If ($null -eq $result -Or $result.StatusCode -eq 404) {
+    If ($result.StatusCode -eq 404) {
         return @()
     }
 
     # Jira will return a 400 when a issue doesn't produce any results
-    If ($null -eq $result -Or $result.StatusCode -eq 400) {
+    If ($result.StatusCode -eq 400) {
       Write-Warning "Failed getting Jira Issues: $($result.Content | ConvertTo-Json)"
       return @()
     }
@@ -130,8 +131,7 @@ function Get-JiraIssue {
       [hashtable]$AuthorizationHeaders,
       [Uri]$BaseUri,
       [string]$IssueKey,
-      [bool]$IncludeDetails = $true,
-      [bool]$FailIfJiraInaccessible = $true
+      [bool]$IncludeDetails = $true
   )
 
   If ([string]::IsNullOrEmpty($IssueKey)) {
@@ -139,7 +139,7 @@ function Get-JiraIssue {
   }
 
   $queryParams = @{
-    expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("renderedFields,names,schema,transitions,editmeta,changelog") : ""
+    expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("renderedFields,transitions,editmeta") : ""
   }
   $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
   $uri = New-Object -TypeName System.Uri -ArgumentList $BaseUri, `
@@ -148,10 +148,9 @@ function Get-JiraIssue {
   $result = Invoke-JiraApi `
     -Uri $uri `
     -AuthorizationHeaders $AuthorizationHeaders `
-    -FailOnRequestFailure $FailIfJiraInaccessible `
     -FailIfNotSuccessfulStatusCode $false
 
-  If ($null -eq $result -Or $result.StatusCode -eq 404) {
+  If ($result.StatusCode -eq 404) {
       return $null
   }
 
@@ -179,14 +178,14 @@ function Get-JiraTransitionsByIssue {
 
     $query = $IssueUri.AbsoluteUri + "/transitions?$($queryParamsExpanded -join '&')"
     $uri = [System.Uri] $query
-
+    
     $result = Invoke-JiraApi `
       -Uri $uri `
       -AuthorizationHeaders $AuthorizationHeaders `
       -FailOnRequestFailure $false `
       -FailIfNotSuccessfulStatusCode $false
 
-    If ($null -eq $result -Or $result.StatusCode -eq 404) {
+    If ($result.StatusCode -eq 404) {
         return @()
     }
 
@@ -207,8 +206,7 @@ function Push-JiraTicketTransition {
         [Uri]$IssueUri,
         [string]$TransitionId,
         [hashtable]$Fields = @{},
-        [hashtable]$Updates = @{},
-        [bool]$FailIfJiraInaccessible = $false
+        [hashtable]$Updates = @{}
     )
     
     $runnerUrl = [string]::IsNullOrEmpty($env:GITHUB_SERVER_URL) ? "" : "runner $env:GITHUB_RUNNER_URL"
@@ -252,12 +250,7 @@ function Push-JiraTicketTransition {
       -Uri $uri `
       -AuthorizationHeaders $AuthorizationHeaders `
       -AdditionalArguments $arguments `
-      -FailOnRequestFailure $FailIfJiraInaccessible `
       -FailIfNotSuccessfulStatusCode $false
-
-    If ($null -eq $result) {
-        return $false
-    }
 
     If ($result.StatusCode -eq 204) {
         return $true

@@ -1,3 +1,5 @@
+using module "./src/modules/JiraApis.psm1"
+
 <#
   .SYNOPSIS
   Gets Jira isssue details.
@@ -45,8 +47,6 @@ $global:InformationPreference = "Continue"
 $ErrorActionPreference = "Stop"
 
 try {
-  Import-Module (Join-Path $PSScriptRoot "src" "modules" "JiraApis.psm1")
-  
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
   $baseUri = New-Object -TypeName System.Uri -ArgumentList $JiraBaseUri
   $authorizationHeaders = Get-AuthorizationHeaders -Username $Username -Password $securePassword 
@@ -55,7 +55,6 @@ try {
     -BaseUri $baseUri `
     -IssueKey $IssueKey `
     -AuthorizationHeaders $authorizationHeaders `
-    -FailIfJiraInaccessible $true
 
   If ($null -eq $issue) {
     Write-Error "Issue [$IssueKey] not found"
