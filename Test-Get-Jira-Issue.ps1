@@ -40,11 +40,14 @@ param (
     [string]$Login,
 
     [Alias("jira-base-uri")]
-    [string]$JiraBaseUri = "https://jira.extendhealth.com"
+    [string]$JiraBaseUri = "https://jira.extendhealth.com",
+
+    [switch]$Debug = $false
 )
 
 $global:InformationPreference = "Continue"
-$ErrorActionPreference = "Stop"
+$isDebug = $env:RUNNER_DEBUG -eq "1" -Or $Debug
+$global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
 
 try {
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
@@ -66,4 +69,6 @@ try {
 }
 finally {
   Remove-Module JiraApis
+  $global:InformationPreference = "SilentlyContinue"
+  $global:DebugPreference = "SilentlyContinue"
 }

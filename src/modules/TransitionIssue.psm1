@@ -85,7 +85,7 @@ function Invoke-JiraTransitionTicket {
         }
         
         # TODO: Transition fields & updates have to be on the screen, get from transitions API
-    
+        # TODO: Include field names and Ids
         $availableFields = @{}
         If ($Fields.Count -gt 0) {
             
@@ -115,23 +115,39 @@ function Invoke-JiraTransitionTicket {
         }
     
         # TODO: filter updates if they are not valid for the issue type: 1) fields exists, 2) field is valid for issue type
+
+        $updated = Update-JiraTicket `
+          -IssueUri $issueUri `
+          -Fields $availableFields `
+          -Updates $Updates `
+          -AuthorizationHeaders $AuthorizationHeaders
+        
+        If (!$updated) {
+          "[$issueKey] Unable to update fields for $issueType. Skipping transition!" `
+            | Write-Warning
+    
+          return [TransitionResultType]::Failed
+        }
     
         Write-Information "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
     
         $processed = Push-JiraTicketTransition `
           -IssueUri $issueUri `
           -TransitionId $transitionId `
-          -Fields $availableFields `
-          -Updates ((New-Comment $Comment) + $Updates) `
+          -Updates (New-Comment $Comment) `
           -AuthorizationHeaders $AuthorizationHeaders
   
         $resultType = $processed ? [TransitionResultType]::Success : [TransitionResultType]::Failed
+        
+        throw "Test through, does this show up?"
     }
     catch [JiraInaccessibleException] {
         $resultType = [TransitionResultType]::Failed
         if ($safeFailIfJiraInaccessible) { throw }
         $resultType = [TransitionResultType]::Skipped
-        Write-Warning "[$($issue.key)] Unable to continue transition. Skipping! $($_.Exception)"
+        Write-Warning "[$($issue.key)] Unable to continue transitioning. Skipping!"
+        Write-Warning $_.Exception.MesageWithResponse()
+        Write-Debug $_.ScriptStackTrace
     }
     
     return $resultType

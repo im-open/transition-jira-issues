@@ -21,7 +21,6 @@ param (
 $MAX_ISSUES_TO_TRANSITION = 20
 $MESSAGE_TITLE = "Jira Ticket Transitions"
 
-$ErrorActionPreference = "Stop"
 $global:InformationPreference = "Continue"
 $isDebug = $env:RUNNER_DEBUG -eq "1" -Or $Debug
 $global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
@@ -81,9 +80,11 @@ try {
           -AuthorizationHeaders $authorizationHeaders `
           -MaxResults $MAX_ISSUES_TO_TRANSITION
     }
-    catch [JiraInaccessibleException] {
+    catch [JiraHttpRequesetException] {
         if ($FailIfJiraInaccessible) { throw }
-        Write-Warning "Unable to querying for issues. $($_.Exception)"
+        Write-Warning "Jira might be down. Skipping transitions..."
+        Write-Warning $_.Exception.MesageWithResponse()
+        Write-Debug $_.ScriptStackTrace
     } 
 
     If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible) {
@@ -190,7 +191,20 @@ try {
     
     Exit 0
 }
+catch {
+    Write-Error $_
+
+    If ($_.Exception -is [JiraHttpRequesetException]) {
+      Write-Error "Unable to continue. Jira might be down."
+      Write-Error "Response: $($_.Exception.Response)"
+    }
+    
+    Write-Error $_.ScriptStackTrace
+    Exit 1
+}
 finally {
     Remove-Module -Name JiraApis
     Remove-Module -Name TransitionIssue
+    $global:InformationPreference = "SilentlyContinue"
+    $global:DebugPreference = "SilentlyContinue"
 }
