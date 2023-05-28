@@ -1,25 +1,5 @@
 using module "./JiraApis.psm1"
 
-function New-Comment {
-    Param (
-        [string]$Comment
-    )
-    
-    If ([string]::IsNullOrEmpty($Comment)) {
-        return @{} 
-    }
-
-    return @{
-      comment = @(
-        @{
-          add = @{
-            body = $Comment
-          }
-        }
-      )
-    }
-}
-
 Enum TransitionResultType {
   Unknown
   Unavailable
@@ -46,29 +26,41 @@ function Invoke-JiraTransitionTicket {
 
     $issueKey = $Issue.key
     $issueUri = $Issue.self
+    $issueStatus = $Issue.fields.status.name
+
+    If ([string]::IsNullOrEmpty($issueKey)) {
+      throw "Issue Key is null or missing"
+    }
+
+    If ([string]::IsNullOrEmpty($issueUri)) {
+      throw "Issue Uri is null or missing"
+    }
+
+    If ([string]::IsNullOrEmpty($issueStatus)) {
+      throw "Issue Status is null or missing"
+    }
+
     $issueType = $Issue.fields.issuetype.name
     $issueSummary = $Issue.fields.summary
-    $issueStatus = $Issue.fields.status.name
     $issueLabels = $Issue.fields.labels
     $issueComponents = $Issue.fields.components
     
-    Write-Debug "[$issueKey] $issueType : $issueSummary -> processing with labels [$($issueLabels -join ', ')] and components [$(@($issueComponents | Select-Object -ExpandProperty name) -join ', ')]"
+    Write-Debug "[$issueKey] $issueType : $issueSummary -> processing with labels [$( `
+      $issueLabels -join ', ')] and components [$(@($issueComponents | Select-Object -ExpandProperty name) -join ', ')]"
 
     $resultType = [TransitionResultType]::Unknown
     try {
-        # TODO: include transition IDs
         $transitions = Get-JiraTransitionsByIssue `
-          -IssueUri $issueUri `
-          -AuthorizationHeaders $AuthorizationHeaders
+          -AuthorizationHeaders $AuthorizationHeaders `
+          -IssueUri $issueUri
         
-        # Include status names with possible transitions
         $transitionIdLookup = @{}
         foreach ($transition in $transitions) {
             $transitionIdLookup[$transition.name] = $transition.id
+            # Include status names with possible transitions
             $transitionIdLookup[$transition.to.name] = $transition.id
         }
     
-        # TODO: If there are updates or fields, still continue with the transition, update the Issue as is.
         If ($issueStatus -ieq $TransitionName) {
           "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
             | Write-Warning
@@ -78,27 +70,21 @@ function Invoke-JiraTransitionTicket {
     
         $transitionId = $transitionIdLookup[$TransitionName]
         If ($null -eq $transitionId) {
-            "[$issueKey] Missing transition [$TransitionName] on $issueType! Current in [$issueStatus] state. Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+            "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($transitionIdLookup.Keys -join ', ')" `
               | Write-Warning 
     
             return [TransitionResultType]::Unavailable
         }
         
-        # TODO: Transition fields & updates have to be on the screen, get from transitions API
-        # TODO: Include field names and Ids
+        # TODO: Include field names and Ids or can the API interpret that for us?
+        # TODO: Filter out updates as well
         $availableFields = @{}
         If ($Fields.Count -gt 0) {
             
-            $issueFieldNames = $Issue.fields.psobject.Properties.Name
+            $issueFieldNames = $Issue.editmeta.fields.psobject.Properties.Name
     
             $availableFields = $Fields.GetEnumerator() | ForEach-Object -Begin { $accumulator = @{} } `
-              -Process { 
-                If ($issueFieldNames -ccontains $_.Key) { $accumulator[$_.Key] = $_.Value }
-    
-                # TODO: filter fields if they are not valid for the issue type
-    #            If ($_.Value.issueType -eq $null -Or $_.Value.issueType -ieq $issueType -Or $_.Value.issueType -is [array] -And $_.Value.issueType -icontains $issueType ) { $accumulator[$_.Key] = $_.Value }
-                
-              } `
+              -Process { If ($issueFieldNames -ccontains $_.Key) { $accumulator[$_.Key] = $_.Value } } `
               -End { $accumulator }
     
             $unavailableFields = $Fields.Keys | Where-Object { $availableFields.Keys -cnotcontains $_ } 
@@ -115,12 +101,11 @@ function Invoke-JiraTransitionTicket {
         }
     
         # TODO: filter updates if they are not valid for the issue type: 1) fields exists, 2) field is valid for issue type
-
         $updated = Update-JiraTicket `
+          -AuthorizationHeaders $AuthorizationHeaders `
           -IssueUri $issueUri `
-          -Fields $availableFields `
-          -Updates $Updates `
-          -AuthorizationHeaders $AuthorizationHeaders
+          -Fields $Fields `
+          -Updates $Updates
         
         If (!$updated) {
           "[$issueKey] Unable to update fields for $issueType. Skipping transition!" `
@@ -132,14 +117,12 @@ function Invoke-JiraTransitionTicket {
         Write-Information "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
     
         $processed = Push-JiraTicketTransition `
+          -AuthorizationHeaders $AuthorizationHeaders `
           -IssueUri $issueUri `
           -TransitionId $transitionId `
-          -Updates (New-Comment $Comment) `
-          -AuthorizationHeaders $AuthorizationHeaders
+          -Comment $Comment
   
         $resultType = $processed ? [TransitionResultType]::Success : [TransitionResultType]::Failed
-        
-        throw "Test through, does this show up?"
     }
     catch [JiraInaccessibleException] {
         $resultType = [TransitionResultType]::Failed

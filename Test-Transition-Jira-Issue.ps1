@@ -69,9 +69,9 @@ try {
   $authorizationHeaders = Get-AuthorizationHeaders -Username $Username -Password $securePassword 
 
   $issues = Get-JiraIssuesByQuery `
-    -BaseUri $baseUri `
-    -Jql "key = $IssueKey" `
     -AuthorizationHeaders $authorizationHeaders `
+    -BaseUri $baseUri `
+    -Jql "key = $IssueKey"
 
   If ($issues.Length -eq 0) {
     Write-Error "Issue [$IssueKey] not found"

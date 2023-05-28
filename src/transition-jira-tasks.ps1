@@ -75,9 +75,9 @@ try {
     $issues = @()
     try {
         $issues = Get-JiraIssuesByQuery `
+          -AuthorizationHeaders $authorizationHeaders `
           -BaseUri $baseUri `
           -Jql $JqlToQueryBy `
-          -AuthorizationHeaders $authorizationHeaders `
           -MaxResults $MAX_ISSUES_TO_TRANSITION
     }
     catch [JiraHttpRequesetException] {
@@ -85,7 +85,7 @@ try {
         Write-Warning "Jira might be down. Skipping transitions..."
         Write-Warning $_.Exception.MesageWithResponse()
         Write-Debug $_.ScriptStackTrace
-    } 
+    }
 
     If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible) {
         "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..." `
@@ -99,8 +99,9 @@ try {
         Exit 1
     }
 
+    # TODO: attempt to not use concurrent dictionary
     $processedIssues = [System.Collections.Concurrent.ConcurrentDictionary[string, TransitionResultType]]::new()
-    $issues | ForEach-Object -Parallel {
+    $exceptions = $issues | ForEach-Object -Parallel {
         # Creates its own scope, so have to reimport any modules used.
         # Cannot import in classes or types, so have to specific string values for enums and standard exception classes
         Import-Module (Join-Path $using:PSScriptRoot "modules" "TransitionIssue.psm1")
@@ -110,18 +111,30 @@ try {
         $safeProcessedIssues = $using:processedIssues
         $safeTranstionName = $using:TransitionName
         $safeFailIfJiraInaccessible = $using:FailIfJiraInaccessible
-        
-        $resultType = Invoke-JiraTransitionTicket `
-          -AuthorizationHeaders $using:AuthorizationHeaders `
-          -Issue $issue `
-          -TransitionName $safeTranstionName `
-          -Fields $using:Fields `
-          -Updates $using:Updates `
-          -Comment $using:Comment
-
-        $added = $safeProcessedIssues.TryAdd($issue.key, $resultType)
-        Write-Debug "Added [$($issue.key)] with result [$resultType] to processed issues? $added"
+       
+        try {
+            $resultType = Invoke-JiraTransitionTicket `
+              -AuthorizationHeaders $using:AuthorizationHeaders `
+              -Issue $issue `
+              -TransitionName $safeTranstionName `
+              -Fields $using:Fields `
+              -Updates $using:Updates `
+              -Comment $using:Comment
+  
+            $added = $safeProcessedIssues.TryAdd($issue.key, $resultType)
+            Write-Debug "Added [$( $issue.key )] with result [$resultType] to processed issues? $added"
+        }
+        catch {
+            return $_.Exception
+        }
     } -ThrottleLimit $throttleLimit
+    
+    if ($exceptions.Length -gt 0) {
+        $exceptions | Where-Object { $_ -ne $null } | ForEach-Object {
+            Write-Error -Exception $_
+        } 
+        Exit 1
+    }
 
     # Process Results
     # ------------  
@@ -192,7 +205,7 @@ try {
     Exit 0
 }
 catch {
-    Write-Error $_
+    Write-Error -Exception $_.Exception
 
     If ($_.Exception -is [JiraHttpRequesetException]) {
       Write-Error "Unable to continue. Jira might be down."

@@ -1,24 +1,5 @@
 $JIRA_HELP_URL = "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post"
 
-class JiraHttpRequesetException : System.Net.Http.HttpRequestException {
-  [Uri] $Uri
-  [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject] $Response
-
-  JiraHttpRequesetException([string]$message, [Uri]$Uri, [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$response) : `
-    base("$message - status code [$($response.StatusCode)] using Uri $($Uri)") {
-      $this.Uri = $Uri
-      $this.Response = $response
-  }
-
-  [string] MesageWithResponse() {
-      return "{0}: {1}" -f $this.Message, $this.Response.Content
-  }
-
-  [string] ToString() {
-      return $this.MesageWithResponse()
-  }
-}
-
 function Get-AuthorizationHeaders {
     [OutputType([hashtable])]
     Param (
@@ -92,6 +73,11 @@ function Get-JiraIssuesByQuery {
     }
 
     #TODO: do not return fields, reference metadata instead?
+    # $issueType = $Issue.fields.issuetype.name
+    #    $issueSummary = $Issue.fields.summary
+    #    $issueStatus = $Issue.fields.status.name
+    #    $issueLabels = $Issue.fields.labels
+    #    $issueComponents = $Issue.fields.components
     #expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("transitions,editmeta") : ""
 
     $queryParams = @{
@@ -114,7 +100,8 @@ function Get-JiraIssuesByQuery {
 
     # Jira will return a 400 when a issue doesn't produce any results
     If ($response.StatusCode -eq 400) {
-      Write-Warning "Failed querying Jira Issues: $($response.Content | ConvertTo-Json -AsHashTable)"
+      Write-Warning "Failed querying Jira Issues: $( `
+        $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)"
       return @()
     }
 
@@ -122,7 +109,10 @@ function Get-JiraIssuesByQuery {
         throw [JiraHttpRequesetException]::new("Failed querying {$Jql}", $uri, $response)
     }
     
-    $issues = $response.Content.issues
+    $issues = ($response.Content | ConvertFrom-Json).issues
+    If($issues -eq $null) {
+      return @()
+    }
 
     # Do not flattern array if single item
     return ,@($issues)
@@ -146,7 +136,6 @@ function Get-JiraIssue {
     expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("renderedFields,transitions,editmeta") : ""
   }
   
-  # TODO: encrypte, verify other commands.  Perhaps use URI Builder
   $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
   $uri = New-Object -TypeName System.Uri -ArgumentList $BaseUri, `
     ("/rest/api/2/issue/{0}?{1}" -f $IssueKey, ($queryParamsExpanded -join '&'))
@@ -164,7 +153,7 @@ function Get-JiraIssue {
       throw [JiraHttpRequesetException]::new("Failed getting Jira Issue [$IssueKey]", $uri, $response)
   }
 
-  return $response.Content
+  return $response.Content | ConvertFrom-Json
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-get
@@ -194,11 +183,17 @@ function Get-JiraTransitionsByIssue {
     }
 
     If ($response.StatusCode -ne 200) {
-        throw [JiraHttpRequesetException]::new("Failed getting transitions for Jira Issue resulting in status code $($response.StatusCode) at uri $IssueUri", $IssueUri, $response)
+        throw [JiraHttpRequesetException]::new("Failed getting transitions for Jira Issue resulting in status code $( `
+          $response.StatusCode) at uri $IssueUri", $IssueUri, $response)
+    }
+    
+    $transitions = ($response.Content | ConvertFrom-Json).transitions 
+    If ($transitions -eq $null) {
+      return @()
     }
 
     # Do not flattern array if single item
-    return ,@($response.Content.transitions)
+    return ,@($transitions)
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-put
@@ -213,38 +208,18 @@ function Update-JiraTicket {
     [hashtable]$Updates = @{}
   )
 
-  $runnerUrl = [string]::IsNullOrEmpty($env:GITHUB_SERVER_URL) ? "" : " with runner $env:GITHUB_RUNNER_URL"
-  
-  $historyMetadata = @{
-    activityDescription = "GitHub Workflow Update Fields"
-    description = "via GitHub Actions$runnerUrl"
-    type = "myplugin:type"
-    actor = @{
-      id = "github-actions"
-    }
-    generator = @{
-      id = "github-actions"
-      type = "github-application"
-    }
-    cause = @{
-      id = "github-actions"
-      type = "github-event"
-    }
-  }
-
   $body = @{
     notifyUsers = $false
     fields = $Fields
     update = $Updates
-    historyMetadata = $historyMetadata
-  } | ConvertTo-Json -Depth 5 -Compress
+    historyMetadata = (New-JiraHistoryMetadata -ActionType "Update Fields")
+  }
+  "Update Issue Request Body: $($Body | ConvertTo-Json  -Depth 10)" | Write-Debug
 
   $arguments = @{
-    Body = $Body
+    Body = ($Body | ConvertTo-Json -Depth 20 -Compress)
     Method = "Put"
   }
-
-  "Update Issue Request Body: $($Body | ConvertFrom-Json | ConvertTo-Json -Depth 5)" | Write-Debug
 
   $response = Invoke-JiraApi `
       -Uri $IssueUri `
@@ -252,8 +227,6 @@ function Update-JiraTicket {
       -AdditionalArguments $arguments `
       -SkipHttpErrorCheck
   
-  Write-Debug "Update Issue Response: $($response | ConvertTo-Json -Depth 5)"
-
   If ($response.StatusCode -eq 204) {
     return $true
   }
@@ -263,11 +236,13 @@ function Update-JiraTicket {
   }
 
   If ($response.StatusCode -eq 400) {
-    If ($response.Content.errorMessages.Length -eq 0) {
-      $response.Content.errorMessages = "Update Error. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
+    $content = ($response.Content | ConvertFrom-Json -AsHashTable)
+    If ($content.errorMessage.Length -eq 0) {
+      $content.errorMessages = "Error on Update. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
     }
 
-    "Unable to update issue [$IssueUri] due to $($response.StatusDescription). See errors: $($response.Content | ConvertTo-Json -AsHashTable)" `
+    "Unable to update issue [$IssueUri] due to $($response.StatusDescription). See errors: $( `
+        $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)" `
         | Write-Warning
 
     return $false
@@ -287,43 +262,24 @@ function Push-JiraTicketTransition {
         [Uri]$IssueUri,
         [string]$TransitionId,
         [hashtable]$Fields = @{},
-        [hashtable]$Updates = @{}
+        [hashtable]$Updates = @{},
+        [string]$Comment = $null 
     )
     
-    $runnerUrl = [string]::IsNullOrEmpty($env:GITHUB_SERVER_URL) ? "" : " with runner $env:GITHUB_RUNNER_URL"
-    # TODO: move to New-JiraHistoryMetadata
-    $historyMetadata = @{
-      activityDescription = "GitHub Workflow Transition"
-      description = "via GitHub Actions Transitioner$runnerUrl"
-      type = "myplugin:type"
-      actor = @{
-        id = "github-actions"
-      }
-      generator = @{
-        id = "github-actions"
-        type = "github-application"
-      }
-      cause = @{
-        id = "github-actions"
-        type = "github-event"
-      }
-    }
-
     $body = @{
       transition = @{
         id = $TransitionId
       }
       fields = $Fields
-      update = $Updates
-      historyMetadata = $historyMetadata
-    } | ConvertTo-Json -Depth 5 -Compress
+      update = $Updates + (New-Comment $Comment)
+      historyMetadata = New-JiraHistoryMetadata -ActionType "Transition" -Purpose "Transitioner"
+    }
+    "Transition Issue Request Body: $($Body | ConvertTo-Json  -Depth 10)" | Write-Debug
 
     $arguments = @{
-      Body = $Body
+      Body = ($Body | ConvertTo-Json  -Depth 20 -Compress)
       Method = "Post"
     }
-
-    "Transition Issue Request Body: $($Body | ConvertFrom-Json | ConvertTo-Json -Depth 5)" | Write-Debug
 
     $query = $IssueUri.AbsoluteUri + "/transitions"
     $uri = [System.Uri] $query
@@ -343,13 +299,15 @@ function Push-JiraTicketTransition {
     }
 
     If ($response.StatusCode -eq 400) {
-      If ($response.Content.errorMessages.Length -eq 0) {
-        $response.Content.errorMessages = "Transition Error. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
+      $content = ($response.Content | ConvertFrom-Json -AsHashTable)
+      If ($content.errorMessage.Length -eq 0) {
+        $content.errorMessages = "Error on Transition. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
       }
-      
-      "Unable to transition issue [$IssueUri] due to $($response.StatusDescription). See errors: $($response.Content | ConvertTo-Json -AsHashTable)" `
+
+      "Unable to transition issue [$IssueUri] due to $($response.StatusDescription). See errors: $( `
+        $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)" `
         | Write-Warning
-      
+
       # TODO: lookup if error is specific to a field name, if so, get that field name
       # pass n ithe entire issue instead of just the URI
       # if possible, also output what is being asked for so it can be sent to the notifications.  Output this so it can be included on teams notification.
@@ -358,6 +316,71 @@ function Push-JiraTicketTransition {
     }
 
     throw [JiraHttpRequesetException]::new("Failed transitioning Jira Issue to transition ID [$TransitionId]", $IssueUri, $response)
+}
+
+function New-JiraHistoryMetadata {
+  [OutputType([PSCustomObject])]
+  Param (
+      [string]$ActionType,
+      [string]$Purpose
+  )
+
+  $runnerUrl = [string]::IsNullOrEmpty($env:GITHUB_SERVER_URL) ? "" : "- runner $env:GITHUB_RUNNER_URL"
+  return @{
+    activityDescription = "GitHub Action $ActionType"
+    description = (@("GitHub Action", $Purpose, $runnerUrl) | Where-Object { [string]::IsNullOrEmpty($_) -eq $false }) -join " "
+    type = "myplugin:type"
+    actor = @{
+      id = "github-actions"
+    }
+    generator = @{
+      id = "github-actions"
+      type = "github-application"
+    }
+    cause = @{
+      id = "github-actions"
+      type = "github-event"
+    }
+  }
+}
+
+function New-Comment {
+  Param (
+    [string]$Comment
+  )
+
+  If ([string]::IsNullOrEmpty($Comment)) {
+    return @{}
+  }
+
+  return @{
+    comment = @(
+    @{
+      add = @{
+        body = $Comment
+      }
+    }
+    )
+  }
+}
+
+class JiraHttpRequesetException : System.Net.Http.HttpRequestException {
+  [Uri] $Uri
+  [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject] $Response
+
+  JiraHttpRequesetException([string]$message, [Uri]$Uri, [Microsoft.PowerShell.Commands.BasicHtmlWebResponseObject]$response) : `
+    base("$message - status code [$($response.StatusCode)] using Uri $($Uri)") {
+      $this.Uri = $Uri
+      $this.Response = $response
+  }
+
+  [string] MesageWithResponse() {
+      return "{0}: {1}" -f $this.Message, $this.Response.Content
+  }
+
+  [string] ToString() {
+      return $this.MesageWithResponse()
+  }
 }
 
 Export-ModuleMember -Function Push-JiraTicketTransition, Get-JiraTransitionsByIssue, Get-JiraIssuesByQuery, Get-JiraIssue, Update-JiraTicket, Get-AuthorizationHeaders

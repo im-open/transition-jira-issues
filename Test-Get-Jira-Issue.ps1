@@ -55,9 +55,9 @@ try {
   $authorizationHeaders = Get-AuthorizationHeaders -Username $Username -Password $securePassword 
 
   $issue = Get-JiraIssue `
-    -BaseUri $baseUri `
-    -IssueKey $IssueKey `
     -AuthorizationHeaders $authorizationHeaders `
+    -BaseUri $baseUri `
+    -IssueKey $IssueKey
 
   If ($null -eq $issue) {
     Write-Error "Issue [$IssueKey] not found"
