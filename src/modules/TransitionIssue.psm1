@@ -42,7 +42,7 @@ function Get-ReducedFields {
     $unavailableFields = $Fields.Keys | Where-Object { !$FieldIdLookup.ContainsKey($_) }
     If ($unavailableFields.Count -gt 0) {
         "[$issueKey] Fields were omitted because they are not valid for the issue: $($unavailableFields -join ', ')" `
-          | Write-Warning
+          | Write-Debug
     }
     
     return $reducedFields
@@ -60,7 +60,7 @@ function Get-ReducedUpdates {
     $issueType = $Issue.fields.issuetype.name
     $reducedUpdates = @{}
     If ($Updates.Count -eq 0) {
-      return $reducedUpdates
+        return $reducedUpdates
     }
     
     $unavailableUpdates = @{}
@@ -131,23 +131,18 @@ function Invoke-JiraTransitionTicket {
     )
 
     If ([string]::IsNullOrEmpty($TransitionName)) {
-      throw "Transition name is null or missing" 
+        throw "[$issueKey] Transition name is null or missing" 
     }
     
     $issueKey = $Issue.key
-    $issueUri = $Issue.self
     $issueStatus = $Issue.fields.status.name
 
     If ([string]::IsNullOrEmpty($issueKey)) {
-      throw "Issue Key is null or missing"
-    }
-
-    If ([string]::IsNullOrEmpty($issueUri)) {
-      throw "Issue Uri is null or missing"
+        throw "[$issueKey] Issue Key is null or missing"
     }
 
     If ([string]::IsNullOrEmpty($issueStatus)) {
-      throw "Issue Status is null or missing"
+        throw "[$issueKey] Issue Status is null or missing"
     }
 
     $issueType = $Issue.fields.issuetype.name
@@ -166,10 +161,10 @@ function Invoke-JiraTransitionTicket {
             $fieldIdLookup[$id] = $id
             $fieldIdLookup[$field.Value.name] = $id
         }
-      
+
         $edited = Edit-JiraTicket `
           -AuthorizationHeaders $AuthorizationHeaders `
-          -IssueUri $issueUri `
+          -Issue $Issue `
           -Fields (Get-ReducedFields -Fields $Fields -Issue $Issue -FieldIdLookup $fieldIdLookup) `
           -Updates (Get-ReducedUpdates -Updates $Updates -Issue $Issue -FieldIdLookup $fieldIdLookup)
 
@@ -206,7 +201,7 @@ function Invoke-JiraTransitionTicket {
     
         $processed = Push-JiraTicketTransition `
           -AuthorizationHeaders $AuthorizationHeaders `
-          -IssueUri $issueUri `
+          -Issue $Issue `
           -TransitionId $transitionId `
           -Comment $Comment
   

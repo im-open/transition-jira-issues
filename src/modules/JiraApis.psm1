@@ -1,5 +1,31 @@
 $JIRA_HELP_URL = "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post"
 
+function Invoke-HandleBadRequest {
+    Param (
+        [hashtable]$content,
+        [PSCustomObject]$Issue
+    )
+  
+    If ($content.errorMessages.Count -eq 0) {
+        $content.errorMessages = "Error on Transition. See $( $env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL ) for help."
+    }
+  
+    $fieldIdToName = @{}
+    ForEach ($fieldId in $content.errors.Keys) {
+      $field = $Issue.editmeta.fields.$fieldId
+      If ($null -ne $field -And $field.name -ne $fieldId -And $content.errors[$fieldId] -inotlike "*$( $field.name )*") {
+          $fieldIdToName.Add($fieldId, $field.name)
+      }
+    }
+  
+    If ($fieldIdToName.Count -gt 0) {
+        $content.Add("names", $fieldIdToName)
+    }
+  
+    "[$issueKey] Unable to transition issue [$issueUri] due to $( $response.StatusDescription ). See errors: $( `
+      $content | ConvertTo-Json -Depth 10)" | Write-Warning
+}
+
 function Get-AuthorizationHeaders {
     [OutputType([hashtable])]
     Param (
@@ -126,7 +152,7 @@ function Get-JiraIssue {
   }
 
   $queryParams = @{
-    expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("renderedFields,transitions,editmeta") : ""
+    expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("renderedFields,transitions,editmeta,names") : ""
   }
   
   $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
@@ -156,10 +182,17 @@ function Edit-JiraTicket {
   [OutputType([bool])]
   Param (
     [hashtable]$AuthorizationHeaders = @{},
-    [Uri]$IssueUri,
+    [PSCustomObject]$Issue,
     [hashtable]$Fields = @{},
     [hashtable]$Updates = @{}
   )
+
+  $issueKey = $Issue.key
+  $issueUri = $Issue.self
+
+  If ([string]::IsNullOrEmpty($Issue.self)) {
+    throw "[$issueKey] Issue Uri is null or missing"
+  }
 
   $body = @{
     notifyUsers = $false
@@ -167,7 +200,7 @@ function Edit-JiraTicket {
     update = $Updates
     historyMetadata = (New-JiraHistoryMetadata -ActionType "Update Fields")
   }
-  "Edit Issue Request Body: $($Body | ConvertTo-Json  -Depth 10)" | Write-Debug
+  "[$issueKey] Edit Issue Request Body: $($Body | ConvertTo-Json  -Depth 10)" | Write-Debug
 
   $arguments = @{
     Body = ($Body | ConvertTo-Json -Depth 20 -Compress)
@@ -175,7 +208,7 @@ function Edit-JiraTicket {
   }
 
   $response = Invoke-JiraApi `
-      -Uri $IssueUri `
+      -Uri $issueUri `
       -AuthorizationHeaders $AuthorizationHeaders `
       -AdditionalArguments $arguments `
       -SkipHttpErrorCheck
@@ -190,18 +223,11 @@ function Edit-JiraTicket {
 
   If ($response.StatusCode -eq 400) {
     $content = ($response.Content | ConvertFrom-Json -AsHashTable)
-    If ($content.errorMessages.Count -eq 0) {
-      $content.errorMessages = "Error on Jira Issue Edit. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
-    }
-
-    "Unable to edit issue [$IssueUri] due to $($response.StatusDescription). See errors: $( `
-        $content | ConvertTo-Json -Depth 10)" `
-        | Write-Warning
-
+    Invoke-HandleBadRequest -Issue $Issue -Content $content
     return $false
   }
 
-  throw [JiraHttpRequesetException]::new("Failed editing Jira Issue", $IssueUri, $response)
+  throw [JiraHttpRequesetException]::new("Failed editing Jira Issue [$issueKey]", $IssueUri, $response)
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
@@ -212,12 +238,19 @@ function Push-JiraTicketTransition {
     [OutputType([bool])]
     Param (
         [hashtable]$AuthorizationHeaders = @{},
-        [Uri]$IssueUri,
+        [PSCustomObject]$Issue,
         [string]$TransitionId,
         [hashtable]$Fields = @{},
         [hashtable]$Updates = @{},
         [string]$Comment = $null 
     )
+    
+    $issueKey = $Issue.key
+    $issueUri = $Issue.self
+
+    If ([string]::IsNullOrEmpty($Issue.self)) {
+      throw "[$issueKey] Issue Uri is null or missing"
+    }
     
     $body = @{
       transition = @{
@@ -227,18 +260,15 @@ function Push-JiraTicketTransition {
       update = $Updates + (New-Comment $Comment)
       historyMetadata = New-JiraHistoryMetadata -ActionType "Transition" -Purpose "Transitioner"
     }
-    "Transition Issue Request Body: $($Body | ConvertTo-Json  -Depth 10)" | Write-Debug
+    "[$issueKey] Transition Issue Request Body: $($Body | ConvertTo-Json  -Depth 10)" | Write-Debug
 
     $arguments = @{
       Body = ($Body | ConvertTo-Json  -Depth 20 -Compress)
       Method = "Post"
     }
-
-    $query = $IssueUri.AbsoluteUri + "/transitions"
-    $uri = [System.Uri] $query
-
+    
     $response = Invoke-JiraApi `
-      -Uri $uri `
+      -Uri "$issueUri/transitions" `
       -AuthorizationHeaders $AuthorizationHeaders `
       -AdditionalArguments $arguments `
       -SkipHttpErrorCheck
@@ -252,19 +282,12 @@ function Push-JiraTicketTransition {
     }
 
     If ($response.StatusCode -eq 400) {
-      $content = ($response.Content | ConvertFrom-Json -AsHashTable)
-      If ($content.errorMessages.Count -eq 0) {
-        $content.errorMessages = "Error on Transition. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
-      }
-
-      "Unable to transition issue [$IssueUri] due to $($response.StatusDescription). See errors: $( `
-        $content | ConvertTo-Json -Depth 10)" `
-        | Write-Warning
-
-      return $false
+        $content = ($response.Content | ConvertFrom-Json -AsHashTable)
+        Invoke-HandleBadRequest -Issue $Issue -Content $content
+        return $false
     }
 
-    throw [JiraHttpRequesetException]::new("Failed transitioning Jira Issue to transition ID [$TransitionId]", $IssueUri, $response)
+    throw [JiraHttpRequesetException]::new("Failed transitioning Jira Issue [$issueKey] to transition ID [$TransitionId]", $issueUri, $response)
 }
 
 function New-JiraHistoryMetadata {

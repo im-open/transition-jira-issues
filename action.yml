@@ -73,7 +73,7 @@ outputs:
     
   unavailable-issues:
     description: Issues missing the specificed transition.
-    value: ${{ steps.transition.outputs.unavailableTransitionIssue }}
+    value: ${{ steps.transition.outputs.unavailableTransitionIssues }}
   
   failed-issues:
     description: Issues identified but not successfully processed.

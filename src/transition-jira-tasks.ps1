@@ -149,7 +149,7 @@ try {
     $successfulyProcessedIssueKeys = $transitionedIssueKeys + $skippedIssueKeys
     
     If ($MissingTransitionAsSuccessful -And $unavailableTransitionIssueKeys.Length -gt 0) {
-        Write-Warning "Issues missing transition will be treated as a successful transition!"
+        Write-Information "Issues missing transition will be treated as a successful transition!"
         $successfulyProcessedIssueKeys += $unavailableTransitionIssueKeys
     }
 
@@ -162,7 +162,7 @@ try {
     Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues to transition"
     Write-IssueListOutput -name "transitionedIssues" -issueKeys $transitionedIssueKeys -message "Issues transitioned"
     Write-IssueListOutput -name "failedIssues" -issueKeys $failedIssueKeys -message "Issues unable to be transitioned"
-    Write-IssueListOutput -name "unavailableTransitionIssue" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step" -conditional
+    Write-IssueListOutput -name "unavailableTransitionIssues" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step" -conditional
     Write-IssueListOutput -name "skippedIssues" -issueKeys $skippedIssueKeys -message "Skipped issues with transition already performed" -conditional
     Write-IssueListOutput -name "notfoundIssues" -issueKeys $notFoundIssueKeys -message "Issues not found" -conditional
     

@@ -59,11 +59,12 @@ jobs:
       - name: Transition Jira Ticket to Deployed Status
         # You may also reference just the major or major.minor version
         uses: im-open/transition-jira-tasks-by-query@v2.0.0
+        id: transition
         with:
           jira-username: ${{ vars.JIRA_USERNAME }}
           jira-password: ${{ secrets.JIRA_PASSWORD }}
           domain-name: jira.com
-          transition-name: Deployed # You may also use the transition ID
+          transition-name: Deployed
           
           jql-query: 'issuekey=PROJ-12345'
           # jql-query: "filter='My Filter Name' AND issuekey=PROJ-12345"
@@ -79,6 +80,18 @@ jobs:
           #   {
           #     "customfield_12345": "some value"
           #   } 
+
+      # Some issue types don't have a transition status like others.  
+      # In those cases, where you want to still transition, a second step will need to be invoked.  
+      # You can pass in the `unavailable-issues` output to transition those remaining issues.
+      - name: Transition Remaining Jira Tickets to Closed Status
+        uses: im-open/transition-jira-tasks-by-query@v2.0.0
+        with:
+          jira-username: ${{ vars.JIRA_USERNAME }}
+          jira-password: ${{ secrets.JIRA_PASSWORD }}
+          domain-name: jira.com
+          transition-name: Closed
+          issues: ${{ steps.transition.outputs.unavailable-issues }}
 ```
 
 ## Updating Fields
