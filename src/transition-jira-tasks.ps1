@@ -64,13 +64,16 @@ try {
     Write-Output "::add-mask::$($authorizationHeaders.Authorization)"
 
     If ([string]::IsNullOrEmpty($JqlToQueryBy) -And $IssueKeys.Length -gt 0) {
-        $JqlToQueryBy = "key IN ($($IssueKeys -join ","))"
+        $JqlToQueryBy = "key IN ($($IssueKeys -join ", "))"
     }
-
+    ElseIf ($IssueKeys.Length -gt 0) {
+        $JqlToQueryBy = "($($JqlToQueryBy)) OR key IN ($($IssueKeys -join ", "))"
+    }
+    
     If ([string]::IsNullOrEmpty($JqlToQueryBy)) {
-        Write-Error "Either the JQL or a list of issue keys must be provided"
+        Write-Error "Either the JQL and/or a list of issue keys must be provided"
         Exit 1
-    } 
+    }
     
     $issues = @()
     try {
@@ -88,6 +91,8 @@ try {
         Write-Debug $_.ScriptStackTrace
     }
 
+    Write-Information "Processing issues from JQL [$JqlToQueryBy]"
+    
     If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible) {
         "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..." `
           | Write-Output
@@ -159,7 +164,7 @@ try {
     # Outputs
     # ------------  
     Write-IssueListOutput -name "processedIssues" -issueKeys $successfulyProcessedIssueKeys -message "All successfully processed transitions" -debug
-    Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues to transition"
+    Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues attempted to transition"
     Write-IssueListOutput -name "transitionedIssues" -issueKeys $transitionedIssueKeys -message "Issues transitioned"
     Write-IssueListOutput -name "failedIssues" -issueKeys $failedIssueKeys -message "Issues unable to be transitioned"
     Write-IssueListOutput -name "unavailableTransitionIssues" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step" -conditional
@@ -180,13 +185,13 @@ try {
 
     If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
         Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the '' action input. See job [$env:GITHUB_JOB_URL] logs for details."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See job [$env:GITHUB_ACTION_URL] logs for details."
         Exit 1
     }
 
     If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure) {
         Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job [$env:GITHUB_JOB_URL] logs for details."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job [$env:GITHUB_ACTION_URL] logs for details."
     }
 
     If ($unavailableTransitionIssueKeys.Length -gt 0 -And !$MissingTransitionAsSuccessful) {
