@@ -1,6 +1,6 @@
 # transition-jira-tasks-by-query
 
-This GitHub Action will query Jira using JQL provided as an input, and will transition any tickets it finds to a given status. Credentials can be provided in case they are necessary to perform the transition.
+This GitHub Action will query Jira using JQL provided as an input, and will transition any tickets it finds to a given status.
 
 ## Requirements
 
@@ -33,8 +33,8 @@ This action requires access to our on-prem network for accesss to the Jira serve
 | `fail-on-transition-failure`       | false          | Fail if some issues failed transitioning. _`true` by default._                                                                                                                                                                   |
 | `fail-if-issue-not-found`          | false          | Fail if some issues are not found that are listed in the `issues` input. _`true` by default._                                                                                                                                    |
 | `fail-if-jira-inaccessible`        | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is down but shouldn't block the pipeline. _`false` by default._                                                                                                       |
-| `jira-username`                    | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
-| `jira-password`                    | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
+| `jira-username`                    | false          | The username to login to Jira with in order to perform the transition.                                                                                                                                                           |
+| `jira-password`                    | false          | The password to login to Jira with in order to perform the transition.                                                                                                                                                           |
 
 > <sup>*</sup> Either `jql-query` or `issues` input is required.  If both are provider, both will be included.
 
@@ -115,12 +115,10 @@ _The `update-fields` input would be something like:_
 ```json
 {
     "assignee": {
-      "name": "bob",
-      "issueType": "Story"
+      "name": "bob"
     },
     "resolution": {
-      "name": "Fixed",
-      "issueType": ["Bug", "Story"]
+      "name": "Fixed"
     },
     "customfield_40000": {
       "value": "red"

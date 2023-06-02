@@ -109,8 +109,9 @@ function Get-ReducedUpdates {
                 $appendValue = $operation[$operationName]
                 If ([string]::IsNullOrEmpty($appendValue)) { Continue }
                 
+                $maybeLineBreak = [string]::IsNullOrEmpty($appendValue) ? "" : "`n"
                 $operations += @{
-                    "set" = "$existingValue`n$appendValue" 
+                    "set" = $existingValue + $maybeLineBreak + $appendValue 
                 }
                 Continue
             }
