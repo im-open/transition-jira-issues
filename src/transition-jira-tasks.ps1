@@ -78,12 +78,13 @@ try {
           -AuthorizationHeaders $authorizationHeaders `
           -BaseUri $baseUri `
           -Jql $JqlToQueryBy `
-          -MaxResults $MAX_ISSUES_TO_TRANSITION
+          -MaxResults $MAX_ISSUES_TO_TRANSITION ` 
+          -IncludeDetails
     }
     catch [JiraHttpRequesetException] {
         if ($FailIfJiraInaccessible) { throw }
         Write-Warning "Jira might be down. Skipping transitions..."
-        Write-Warning $_.Exception.MesageWithResponse()
+        Write-Warning $_.Exception.MessageWithResponse()
         Write-Debug $_.ScriptStackTrace
     }
 

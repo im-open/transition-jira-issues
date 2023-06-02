@@ -65,24 +65,17 @@ function Get-JiraIssuesByQuery {
         [Uri]$BaseUri,
         [string]$Jql,
         [int]$MaxResults = 20,
-        [bool]$IncludeDetails = $true
+        [switch]$IncludeDetails = $false
     )
 
     If ([string]::IsNullOrEmpty($Jql)) {
       throw "Jql is null or missing" 
     }
 
-    #TODO: do not return fields, reference metadata instead?
-    # $issueType = $Issue.fields.issuetype.name
-    #    $issueSummary = $Issue.fields.summary
-    #    $issueStatus = $Issue.fields.status.name
-    #    $issueLabels = $Issue.fields.labels
-    #    $issueComponents = $Issue.fields.components
-    #expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("transitions,editmeta") : ""
-
     $queryParams = @{
         maxResults = $MaxResults
         fields = [System.Web.HttpUtility]::UrlEncode("*all,-comment,-description,-fixVersions,-issuelinks,-reporter,-resolution,-subtasks,-timetracking,-worklog,-project,-watches,-attachment")
+        expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("transitions,editmeta") : ""
         jql = [System.Web.HttpUtility]::UrlEncode($Jql)
     }
     $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
@@ -374,12 +367,12 @@ class JiraHttpRequesetException : System.Net.Http.HttpRequestException {
       $this.Response = $response
   }
 
-  [string] MesageWithResponse() {
+  [string] MessageWithResponse() {
       return "{0}: {1}" -f $this.Message, $this.Response.Content
   }
 
   [string] ToString() {
-      return $this.MesageWithResponse()
+      return $this.MessageWithResponse()
   }
 }
 

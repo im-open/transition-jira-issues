@@ -44,6 +44,7 @@ function Invoke-JiraTransitionTicket {
     $issueSummary = $Issue.fields.summary
     $issueLabels = $Issue.fields.labels
     $issueComponents = $Issue.fields.components
+    $transitions = $Issue.transitions
     
     Write-Debug "[$issueKey] $issueType : $issueSummary -> processing with labels [$( `
       $issueLabels -join ', ')] and components [$(@($issueComponents | Select-Object -ExpandProperty name) -join ', ')]"
@@ -104,7 +105,7 @@ function Invoke-JiraTransitionTicket {
         $updated = Update-JiraTicket `
           -AuthorizationHeaders $AuthorizationHeaders `
           -IssueUri $issueUri `
-          -Fields $Fields `
+          -Fields $availableFields `
           -Updates $Updates
         
         If (!$updated) {
@@ -129,7 +130,7 @@ function Invoke-JiraTransitionTicket {
         if ($safeFailIfJiraInaccessible) { throw }
         $resultType = [TransitionResultType]::Skipped
         Write-Warning "[$($issue.key)] Unable to continue transitioning. Skipping!"
-        Write-Warning $_.Exception.MesageWithResponse()
+        Write-Warning $_.Exception.MessageWithResponse()
         Write-Debug $_.ScriptStackTrace
     }
     
