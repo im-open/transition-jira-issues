@@ -8,6 +8,116 @@ Enum TransitionResultType {
   Skipped
 }
 
+function Get-ReducedFields {
+    [OutputType([hashtable])]
+    Param (
+      [PSCustomObject]$Issue,
+      [hashtable]$Fields = @{},
+      [hashtable]$FieldIdLookup = @{}
+    )
+
+    $issueKey = $Issue.key
+    $issueType = $Issue.fields.issuetype.name
+    $reducedFields = @{}
+    If ($Fields.Count -eq 0) {
+        return $reducedFields
+    }
+
+    ForEach ($field in $Fields.GetEnumerator()) {
+        $fieldId = $FieldIdLookup[$field.Key]
+        If ($null -eq $fieldId) { continue }
+        $reducedFields[$fieldId] = $field.Value
+
+        if ($fieldId -ne $field.Key) {
+          Write-Information "[$issueKey] Field {$($field.Key)} translated to field ID $fieldId"
+        }
+    }
+    
+    If ($reducedFields.Count -eq 0) {
+        "[$issueKey] No valid fields were identified for $issueType. No field changes will be applied." `
+          | Write-Warning
+        return $reducedFields
+    }
+
+    $unavailableFields = $Fields.Keys | Where-Object { !$FieldIdLookup.ContainsKey($_) }
+    If ($unavailableFields.Count -gt 0) {
+        "[$issueKey] Fields were omitted because they are not valid for the issue: $($unavailableFields -join ', ')" `
+          | Write-Warning
+    }
+    
+    return $reducedFields
+}
+
+function Get-ReducedUpdates {
+    [OutputType([hashtable])]
+    Param (
+        [PSCustomObject]$Issue,
+        [hashtable]$Updates = @{},
+        [hashtable]$FieldIdLookup = @{}
+    )
+
+    $issueKey = $Issue.key
+    $issueType = $Issue.fields.issuetype.name
+    $reducedUpdates = @{}
+    If ($Updates.Count -eq 0) {
+      return $reducedUpdates
+    }
+    
+    $unavailableUpdates = @{}
+
+    ForEach ($update in $Updates.GetEnumerator()) {
+        $fieldId = $FieldIdLookup[$update.Key]
+        If ($null -eq $fieldId) {
+            $unavailableUpdates["$($update.Key)"] = @()
+            Continue 
+        }
+
+        if ($fieldId -ne $update.Key) {
+          Write-Information "[$issueKey] Field {$($update.Key)} translated to field ID $fieldId"
+        }
+
+        $field = $Issue.editmeta.fields | Select-Object -ExpandProperty $fieldId
+
+        If ($null -eq $field) {
+            $unavailableUpdates["$($update.Key)"] = @()
+            Continue
+        }
+        $operationNames = $field.operations
+        Write-Debug "[$issueKey] Valid operations for field [$fieldId]: $($operationNames -join ', ')"
+
+        $operations = @()
+        ForEach ($operation in $update.Value) {
+            If ($operation.Keys.Count -ne 1) {
+              Write-Warning "[$issueKey] Update operation is invalid. Can only contain one key: $($_.Keys -join ', ')"
+              Continue
+            }
+
+            # Only one key is expected
+            $operationName = $operation.Keys[0]
+            If ($null -eq $operationName -Or $operationNames -cnotcontains $operationName) {
+                $unavailableUpdates["$($update.Key)"] = $unavailableUpdates["$($update.Key)"] + $operationName
+                Continue
+            }
+            $operations += $operation 
+        }
+        
+        if ($operations.Count -eq 0) { Continue }
+        $reducedUpdates[$fieldId] = $operations
+    }
+
+    If ($reducedUpdates.Count -eq 0) {
+        "[$issueKey] No valid update operations were identified for $issueType. No operations will be applied." `
+          | Write-Warning
+    }
+  
+    If ($unavailableUpdates.Count -gt 0) {
+        "[$issueKey] Update operations were omitted because they are not valid for the issue: $($unavailableUpdates | ConvertTo-Json)" `
+          | Write-Warning
+    }
+    
+    return $reducedUpdates
+}
+
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
 function Invoke-JiraTransitionTicket {
     [OutputType([TransitionResultType])]
@@ -23,7 +133,7 @@ function Invoke-JiraTransitionTicket {
     If ([string]::IsNullOrEmpty($TransitionName)) {
       throw "Transition name is null or missing" 
     }
-
+    
     $issueKey = $Issue.key
     $issueUri = $Issue.self
     $issueStatus = $Issue.fields.status.name
@@ -44,29 +154,44 @@ function Invoke-JiraTransitionTicket {
     $issueSummary = $Issue.fields.summary
     $issueLabels = $Issue.fields.labels
     $issueComponents = $Issue.fields.components
-    $transitions = $Issue.transitions
     
     Write-Debug "[$issueKey] $issueType : $issueSummary -> processing with labels [$( `
       $issueLabels -join ', ')] and components [$(@($issueComponents | Select-Object -ExpandProperty name) -join ', ')]"
 
     $resultType = [TransitionResultType]::Unknown
     try {
-        $transitions = Get-JiraTransitionsByIssue `
+        $fieldIdLookup = @{}
+        ForEach ($field in $Issue.editmeta.fields.PSObject.Properties) {
+            $id = $field.Value.fieldId
+            $fieldIdLookup[$id] = $id
+            $fieldIdLookup[$field.Value.name] = $id
+        }
+      
+        $edited = Edit-JiraTicket `
           -AuthorizationHeaders $AuthorizationHeaders `
-          -IssueUri $issueUri
-        
+          -IssueUri $issueUri `
+          -Fields (Get-ReducedFields -Fields $Fields -Issue $Issue -FieldIdLookup $fieldIdLookup) `
+          -Updates (Get-ReducedUpdates -Updates $Updates -Issue $Issue -FieldIdLookup $fieldIdLookup)
+
+        If (!$edited) {
+            "[$issueKey] Unable to edit fields for $issueType. Skipping transition!" `
+              | Write-Warning
+
+            return [TransitionResultType]::Failed
+        }
+      
         $transitionIdLookup = @{}
-        foreach ($transition in $transitions) {
+        ForEach ($transition in $Issue.transitions) {
             $transitionIdLookup[$transition.name] = $transition.id
             # Include status names with possible transitions
             $transitionIdLookup[$transition.to.name] = $transition.id
         }
     
         If ($issueStatus -ieq $TransitionName) {
-          "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
-            | Write-Warning
+            "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
+              | Write-Warning
     
-          return [TransitionResultType]::Skipped 
+            return [TransitionResultType]::Skipped 
         }
     
         $transitionId = $transitionIdLookup[$TransitionName]
@@ -77,44 +202,6 @@ function Invoke-JiraTransitionTicket {
             return [TransitionResultType]::Unavailable
         }
         
-        # TODO: Include field names and Ids or can the API interpret that for us?
-        # TODO: Filter out updates as well
-        $availableFields = @{}
-        If ($Fields.Count -gt 0) {
-            
-            $issueFieldNames = $Issue.editmeta.fields.psobject.Properties.Name
-    
-            $availableFields = $Fields.GetEnumerator() | ForEach-Object -Begin { $accumulator = @{} } `
-              -Process { If ($issueFieldNames -ccontains $_.Key) { $accumulator[$_.Key] = $_.Value } } `
-              -End { $accumulator }
-    
-            $unavailableFields = $Fields.Keys | Where-Object { $availableFields.Keys -cnotcontains $_ } 
-    
-            If (!$availableFields -Or $availableFields.Length -eq 0) {
-              "[$issueKey] No valid fields were identified for $issueType (they are case-sensitive). No field changes will be applied." `
-                | Write-Warning
-            }
-    
-            If ($unavailableFields.Count -gt 0) {
-                "[$issueKey] Fields were omitted because they are not valid for the issue (they are case-sensitive): $($unavailableFields -join ', ')" `
-                  | Write-Warning
-            }
-        }
-    
-        # TODO: filter updates if they are not valid for the issue type: 1) fields exists, 2) field is valid for issue type
-        $updated = Update-JiraTicket `
-          -AuthorizationHeaders $AuthorizationHeaders `
-          -IssueUri $issueUri `
-          -Fields $availableFields `
-          -Updates $Updates
-        
-        If (!$updated) {
-          "[$issueKey] Unable to update fields for $issueType. Skipping transition!" `
-            | Write-Warning
-    
-          return [TransitionResultType]::Failed
-        }
-    
         Write-Information "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
     
         $processed = Push-JiraTicketTransition `

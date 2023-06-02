@@ -18,7 +18,7 @@ inputs:
     description: The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.
     required: true
 
-  overwrite-fields:
+  update-fields:
     description: A map of issue screen fields to overwrite, specifying the sub-field to update and its value for each field. When multiple sub-fields or other operations are required, use 'update' input instead.
     required: false
     
@@ -90,7 +90,7 @@ runs:
       id: transition
       shell: pwsh
       env:
-        FIELDS: ${{ inputs.overwrite-fields }}
+        FIELDS: ${{ inputs.update-fields }}
         UPDATES: ${{ inputs.process-operations }}
       run: |
         If ([string]::IsNullOrEmpty("${{ inputs.jira-username }}")) {

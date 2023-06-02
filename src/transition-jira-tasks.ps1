@@ -78,8 +78,8 @@ try {
           -AuthorizationHeaders $authorizationHeaders `
           -BaseUri $baseUri `
           -Jql $JqlToQueryBy `
-          -MaxResults $MAX_ISSUES_TO_TRANSITION ` 
-          -IncludeDetails
+          -IncludeDetails `
+          -MaxResults $MAX_ISSUES_TO_TRANSITION
     }
     catch [JiraHttpRequesetException] {
         if ($FailIfJiraInaccessible) { throw }
@@ -200,7 +200,7 @@ try {
     }
 
     If ($successfulyProcessedIssueKeys.Length -gt 0) {
-        Write-Output "::notice title=$MESSAGE_TITLE::$(@($transitionedIssueKeys + $skippedIssueKeys) -join ', ') transitioned to [$TransitionName]"
+        Write-Output "::notice title=$MESSAGE_TITLE::$($successfulyProcessedIssueKeys -join ', ') succesfuly processed and/or transitioned to [$TransitionName]"
     }
     
     Exit 0

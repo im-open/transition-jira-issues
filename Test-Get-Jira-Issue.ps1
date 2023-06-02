@@ -64,8 +64,8 @@ try {
     exit 1
   }
 
-  $issue | ConvertTo-Json -Depth 10 | Write-Output
-  Set-Content -Path "./issues.json" -Value ($issue | ConvertTo-Json -Depth 5)
+  Set-Content -Path "./issues.json" -Value ($issue | ConvertTo-Json -Depth 10)
+  Write-Information "Issue [$IssueKey] details written to ./issues.json"
 }
 finally {
   Remove-Module JiraApis

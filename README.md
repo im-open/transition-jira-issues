@@ -20,21 +20,21 @@ This action requires access to our on-prem network for accesss to the Jira serve
 
 ## Inputs
 
-| Parameter                        | Is Required    | Description                                                                                                                                                                                                                      |
-|----------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `domain-name`                    | true           | The domain name for Jira.                                                                                                                                                                                                        |
-| `jql-query`                      | conditionally* | The JQL query to use to find tickets that will be transitioned. A max of 20 issues can be transitioned.                                                                                                                          |
-| `issues`                         | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
-| `transition-name`                | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
-| `overwrite-fields`               | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. |
-| `process-operations`             | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
-| `comment`                        | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
-| `fail-if-issue-not-transitioned` | false          | Fail if some issues where not transitioned. _`true` by default._                                                                                                                                                                 |
+| Parameter                          | Is Required    | Description                                                                                                                                                                                                                      |
+|------------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `domain-name`                      | true           | The domain name for Jira.                                                                                                                                                                                                        |
+| `jql-query`                        | conditionally* | The JQL query to use to find tickets that will be transitioned. A max of 20 issues can be transitioned.                                                                                                                          |
+| `issues`                           | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
+| `transition-name`                  | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
+| `update-fields`                    | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'update' input instead. |
+| `process-operations`               | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'fields' input._                                                                     |
+| `comment`                          | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
+| `fail-if-issue-not-transitioned`   | false          | Fail if some issues where not transitioned. _`true` by default._                                                                                                                                                                 |
 | `missing-transition-as-successful` | false          | Fail if some issues are missing the transition. _`true` by default._                                                                                                                                                             |
-| `fail-if-issue-not-found`        | false          | Fail if some issues are not found that are listed in the `issues` input. _`true` by default._                                                                                                                                    |
-| `fail-if-jira-inaccessible`      | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is down but shouldn't block the pipeline. _`false` by default._                                                                                                       |
-| `jira-username`                  | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
-| `jira-password`                  | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
+| `fail-if-issue-not-found`          | false          | Fail if some issues are not found that are listed in the `issues` input. _`true` by default._                                                                                                                                    |
+| `fail-if-jira-inaccessible`        | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is down but shouldn't block the pipeline. _`false` by default._                                                                                                       |
+| `jira-username`                    | false          | The username to login to Jira with in order to perform the transition. _Will be ignored if not set._                                                                                                                             |
+| `jira-password`                    | false          | The password to login to Jira with in order to perform the transition. _Must be set if `jira-username` is set. If set when `jira-username` is not set, it will be ignored._                                                      |
 
 > <sup>*</sup> Either `jql-query` or `issues` input is required.  If both are provider, `jql-query` will be used.
 
@@ -75,7 +75,7 @@ jobs:
           # etc.
 
           # If you want to update or overwrite fields, you can use the following inputs:
-          # overwrite-fields: |
+          # update-fields: |
           #   {
           #     "customfield_12345": "some value"
           #   } 
@@ -83,19 +83,21 @@ jobs:
 
 ## Updating Fields
 
-They are two different ways to update fields.  Passing a `overwrite-fields` input or an `process-operations` input. You may not specify the same field name in both the `overwrite-fields` and `process-operations` inputs.
+They are two different ways to update fields.  Passing a `update-fields` input or an `process-operations` input. You may not specify the same field name in both the `update-fields` and `process-operations` inputs.
 
 If you are unsure what field names to use, run the [Get-Jira-Issue](../main/Test-Get-Jira-Issue.ps1) script locally from your machine using your ExtendHealth username and password.
 
-> See [Atlassian Edit Issues Example](https://developer.atlassian.com/server/jira/platform/jira-rest-api-example-edit-issues-6291632/) for additional help
+> You may also use the field's display name
 
-### Field specificity
-If a field only exists on a certain issue type, you can specify the type as part of the declaration using `issueType` as a single value or an array.  If not specified, will be applied to all issue types.
+Related: 
+- [Custom Fields](https://atlassianps.org/docs/JiraPS/about/custom-fields.html)
+- [Atlassian Edit Issues Example](https://developer.atlassian.com/server/jira/platform/jira-rest-api-example-edit-issues-6291632/) for additional help
 
-### Overwrite Fields Input
-The easiest solution is to pass `overwrite-fields` input with static changes. These must be screen fields -- fields that a user can edit in Jira on the specific issue type.  If the field doesn't exist on the issue type, it will be ignored.
+### Update Fields Input
 
-_The `overwrite-fields` input would be something like:_
+The easiest solution is to pass `update-fields` input with static changes. These must be screen fields -- fields that a user can edit in Jira on the specific issue type.  If the field doesn't exist on the issue type, it will be ignored.
+
+_The `update-fields` input would be something like:_
 
 ```json
 {
@@ -110,22 +112,21 @@ _The `overwrite-fields` input would be something like:_
     "customfield_40000": {
       "value": "red"
     }
-  
-    // You may also use the field's display name or id
 }
 ```
 
+> If a field doesn't exist on a given Issue Type, it will be ignored
+
 ### Update Operations Input
 
-Update fields by operations. Like adding a comment, creating a link to another ticket, adding additional values to a multi-select field, etc.  Updates all you to add or remove additional values to fields without overwriting what is already there.
+Update fields by operation(s). Adding multiple components, creating a link to another ticket, adding additional values to a multi-select field, etc.  Updating operations allows you to add or remove additional values to fields without overwriting what is already there.
 
-_The `updates` fields would be something like:_
+_The `process-operations` fields would be something like:_
 
 ```json
 {
   "components" : [
     {
-      "issueType": "Bug",
       "remove" : {
         "name" : "Trans/A"
       }
@@ -139,8 +140,8 @@ _The `updates` fields would be something like:_
 }
 ```
 
-> If a field is specific that is not on the issue type, the operation will fail.
-
+> If an operation doesn't exist on a given Issue Type, it will be ignored
+ 
 ## Contributing
 
 When creating new PRs please ensure:

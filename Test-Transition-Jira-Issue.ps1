@@ -39,7 +39,7 @@ param (
     [Alias("transition")]
     [string]$TransitionName,
 
-    [Alias("overwrite-fields")]
+    [Alias("update-fields")]
     [hashtable]$Fields,
     
     [Alias("process-operations")]
@@ -71,7 +71,8 @@ try {
   $issues = Get-JiraIssuesByQuery `
     -AuthorizationHeaders $authorizationHeaders `
     -BaseUri $baseUri `
-    -Jql "key = $IssueKey"
+    -Jql "key = $IssueKey" `
+    -IncludeDetails
 
   If ($issues.Length -eq 0) {
     Write-Error "Issue [$IssueKey] not found"
