@@ -12,7 +12,7 @@ param (
     [string]$JiraUsername,
     [securestring]$JiraPassword,
     [switch]$MissingTransitionAsSuccessful = $false,
-    [switch]$FailIfNoTransitionedIssues = $false,
+    [switch]$FailOnTransitionFailure = $false,
     [switch]$FailIfNotFoundIssue = $false,
     [switch]$FailIfJiraInaccessible = $false,
     [switch]$Debug = $false
@@ -100,7 +100,6 @@ try {
         Exit 1
     }
 
-    # TODO: attempt to not use concurrent dictionary
     $processedIssues = [System.Collections.Concurrent.ConcurrentDictionary[string, TransitionResultType]]::new()
     $exceptions = $issues | ForEach-Object -Parallel {
         # Creates its own scope, so have to reimport any modules used.
@@ -163,31 +162,36 @@ try {
     Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues to transition"
     Write-IssueListOutput -name "transitionedIssues" -issueKeys $transitionedIssueKeys -message "Issues transitioned"
     Write-IssueListOutput -name "failedIssues" -issueKeys $failedIssueKeys -message "Issues unable to be transitioned"
-    Write-IssueListOutput -name "unavailableTransitionIssue" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step and skipped" -conditional
+    Write-IssueListOutput -name "unavailableTransitionIssue" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step" -conditional
     Write-IssueListOutput -name "skippedIssues" -issueKeys $skippedIssueKeys -message "Skipped issues with transition already performed" -conditional
     Write-IssueListOutput -name "notfoundIssues" -issueKeys $notFoundIssueKeys -message "Issues not found" -conditional
     
     # Notices on Runner
     # ------------
-    If ($identifiedIssueKeys.Length -eq 0 -And $FailIfNoTransitionedIssues) {
+    If ($identifiedIssueKeys.Length -eq 0 -And $FailOnTransitionFailure) {
         Write-Output "::error title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
         Exit 1
     }
 
-    If ($identifiedIssueKeys.Length -eq 0 -And !$FailIfNoTransitionedIssues) {
+    If ($identifiedIssueKeys.Length -eq 0 -And !$FailOnTransitionFailure) {
         Write-Output "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
         Exit 0 
     }
 
-    If ($failedIssueKeys.Length -gt 0 -And $FailIfNoTransitionedIssues) {
+    If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
         Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $( `
           $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the '' action input. See job [$env:GITHUB_JOB_URL] logs for details."
         Exit 1
     }
 
-    If ($failedIssueKeys.Length -gt 0 -And !$FailIfNoTransitionedIssues) {
+    If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure) {
         Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $( `
           $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job [$env:GITHUB_JOB_URL] logs for details."
+    }
+
+    If ($unavailableTransitionIssueKeys.Length -gt 0 -And !$MissingTransitionAsSuccessful) {
+      Write-Output "::error title=$MESSAGE_TITLE::$($unavailableTransitionIssueKeys -join ', ') missing transition [$TransitionName]. You may enable 'missing-transition-as-successful' to treat these as a successful transition."
+      Exit 1
     }
 
     If ($notFoundIssueKeys.Length -gt 0 -And $FailIfNotFoundIssue) {

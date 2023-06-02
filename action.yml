@@ -35,8 +35,8 @@ inputs:
     required: false
     default: 'true'
       
-  fail-if-issue-not-transitioned:
-    description: Fail if some issues where not transitioned.
+  fail-on-transition-failure:
+    description: Fail if some issues failed transitioning.
     required: false
     default: 'true'
     
@@ -124,6 +124,6 @@ runs:
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword `
           -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
-          -FailIfNoTransitionedIssues:$${{ (inputs.fail-if-issue-not-transitioned == 'true' && 'true') || 'false' }} `
+          -FailOnTransitionFailure:$${{ (inputs.fail-on-transition-failure == 'true' && 'true') || 'false' }} `
           -FailIfNotFoundIssues:$${{ (inputs.fail-if-issue-not-found == 'true' && 'true') || 'false' }} `
           -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 

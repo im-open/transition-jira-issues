@@ -149,47 +149,6 @@ function Get-JiraIssue {
   return $response.Content | ConvertFrom-Json
 }
 
-# https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-get
-# TODO: remove, no longer needed
-function Get-JiraTransitionsByIssue {
-    [OutputType([PSCustomObject[]])]
-    Param (
-        [hashtable]$AuthorizationHeaders,
-        [Uri]$IssueUri,
-        [bool]$IncludeDetails = $true
-    )
-
-    $queryParams = @{
-      expand = $IncludeDetails ? "transitions.fields" : ""
-    }
-    $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
-
-    $query = $IssueUri.AbsoluteUri + "/transitions?$($queryParamsExpanded -join '&')"
-    $uri = [System.Uri] $query
-    
-    $response = Invoke-JiraApi `
-      -Uri $uri `
-      -AuthorizationHeaders $AuthorizationHeaders `
-      -SkipHttpErrorCheck
-
-    If ($response.StatusCode -eq 404) {
-        return @()
-    }
-
-    If ($response.StatusCode -ne 200) {
-        throw [JiraHttpRequesetException]::new("Failed getting transitions for Jira Issue resulting in status code $( `
-          $response.StatusCode) at uri $IssueUri", $IssueUri, $response)
-    }
-    
-    $transitions = ($response.Content | ConvertFrom-Json).transitions 
-    If ($null -eq $transitions) {
-      return @()
-    }
-
-    # Do not flattern array if single item
-    return ,@($transitions)
-}
-
 # https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-put
 # Eventhough its API shows it can transition an issue, it doesn't work for some reason.
 # Thus we use the Transition endpoint instead for that use case.
@@ -231,12 +190,12 @@ function Edit-JiraTicket {
 
   If ($response.StatusCode -eq 400) {
     $content = ($response.Content | ConvertFrom-Json -AsHashTable)
-    If ($content.errorMessage.Length -eq 0) {
+    If ($content.errorMessages.Count -eq 0) {
       $content.errorMessages = "Error on Jira Issue Edit. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
     }
 
     "Unable to edit issue [$IssueUri] due to $($response.StatusDescription). See errors: $( `
-        $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)" `
+        $content | ConvertTo-Json -Depth 10)" `
         | Write-Warning
 
     return $false
@@ -294,17 +253,13 @@ function Push-JiraTicketTransition {
 
     If ($response.StatusCode -eq 400) {
       $content = ($response.Content | ConvertFrom-Json -AsHashTable)
-      If ($content.errorMessage.Length -eq 0) {
+      If ($content.errorMessages.Count -eq 0) {
         $content.errorMessages = "Error on Transition. See $($env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL) for help."
       }
 
       "Unable to transition issue [$IssueUri] due to $($response.StatusDescription). See errors: $( `
-        $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)" `
+        $content | ConvertTo-Json -Depth 10)" `
         | Write-Warning
-
-      # TODO: lookup if error is specific to a field name, if so, get that field name
-      # pass n ithe entire issue instead of just the URI
-      # if possible, also output what is being asked for so it can be sent to the notifications.  Output this so it can be included on teams notification.
 
       return $false
     }
