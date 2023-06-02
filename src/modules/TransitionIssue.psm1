@@ -29,13 +29,13 @@ function Get-ReducedFields {
         $reducedFields[$fieldId] = $field.Value
 
         if ($fieldId -ne $field.Key) {
-          Write-Information "[$issueKey] Field {$($field.Key)} translated to field ID $fieldId"
+          Write-Debug "[$issueKey] Field {$($field.Key)} translated to field ID {$fieldId}"
         }
     }
     
     If ($reducedFields.Count -eq 0) {
         "[$issueKey] No valid fields were identified for $issueType. No field changes will be applied." `
-          | Write-Warning
+          | Write-Debug
         return $reducedFields
     }
 
@@ -73,16 +73,20 @@ function Get-ReducedUpdates {
         }
 
         if ($fieldId -ne $update.Key) {
-          Write-Information "[$issueKey] Field {$($update.Key)} translated to field ID $fieldId"
+          Write-Debug "[$issueKey] Field {$($update.Key)} translated to field ID {$fieldId}"
         }
 
-        $field = $Issue.editmeta.fields | Select-Object -ExpandProperty $fieldId
-
+        $field = $Issue.editmeta.fields.$fieldId
         If ($null -eq $field) {
             $unavailableUpdates["$($update.Key)"] = @()
             Continue
         }
         $operationNames = $field.operations
+        
+        If ($operationNames -icontains "set" -And $field.schema.type -eq "string") {
+            $operationNames += "append"
+        }
+        
         Write-Debug "[$issueKey] Valid operations for field [$fieldId]: $($operationNames -join ', ')"
 
         $operations = @()
@@ -98,6 +102,18 @@ function Get-ReducedUpdates {
                 $unavailableUpdates["$($update.Key)"] = $unavailableUpdates["$($update.Key)"] + $operationName
                 Continue
             }
+            
+            # Allow those fields that only have a set and are a string value, to append
+            If ($operationName -ieq "append") {
+                $existingValue = $Issue.fields.$fieldId
+                $appendValue = $operation[$operationName]
+                If ([string]::IsNullOrEmpty($appendValue)) { Continue }
+                
+                $operations += @{
+                    "set" = "$existingValue`n$appendValue" 
+                }
+                Continue
+            }
             $operations += $operation 
         }
         
@@ -107,12 +123,13 @@ function Get-ReducedUpdates {
 
     If ($reducedUpdates.Count -eq 0) {
         "[$issueKey] No valid update operations were identified for $issueType. No operations will be applied." `
-          | Write-Warning
+          | Write-Debug
+        return $reducedUpdates
     }
   
     If ($unavailableUpdates.Count -gt 0) {
         "[$issueKey] Update operations were omitted because they are not valid for the issue: $($unavailableUpdates | ConvertTo-Json)" `
-          | Write-Warning
+          | Write-Debug
     }
     
     return $reducedUpdates

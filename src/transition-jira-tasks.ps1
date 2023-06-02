@@ -209,7 +209,7 @@ try {
     }
 
     If ($successfulyProcessedIssueKeys.Length -gt 0) {
-        Write-Output "::notice title=$MESSAGE_TITLE::$($successfulyProcessedIssueKeys -join ', ') succesfuly processed and/or transitioned to [$TransitionName]"
+        Write-Output "::notice title=$MESSAGE_TITLE::$($successfulyProcessedIssueKeys -join ', ') successfully processed and/or transitioned to [$TransitionName]"
     }
     
     Exit 0
