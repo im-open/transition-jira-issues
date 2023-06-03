@@ -8,7 +8,7 @@ Enum TransitionResultType {
   Skipped
 }
 
-function Get-ReducedFields {
+Function Get-ReducedFields {
     [OutputType([hashtable])]
     Param (
       [PSCustomObject]$Issue,
@@ -48,7 +48,7 @@ function Get-ReducedFields {
     return $reducedFields
 }
 
-function Get-ReducedUpdates {
+Function Get-ReducedUpdates {
     [OutputType([hashtable])]
     Param (
         [PSCustomObject]$Issue,
@@ -137,7 +137,7 @@ function Get-ReducedUpdates {
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
-function Invoke-JiraTransitionTicket {
+Function Invoke-JiraTransitionTicket {
     [OutputType([TransitionResultType])]
     Param (
         [hashtable]$AuthorizationHeaders,

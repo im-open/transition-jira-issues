@@ -25,12 +25,12 @@ $global:InformationPreference = "Continue"
 $isDebug = $env:RUNNER_DEBUG -eq "1" -Or $Debug
 $global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
 
-$throttleLimit = $isDebug ? 1 : 5
+$throttleLimit = $isDebug ? 1 : $MAX_ISSUES_TO_TRANSITION 
 
 $env:GITHUB_RUNNER_URL = "{0}/{1}/actions/runs/{2}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_RUN_ID 
 $env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, "im-open/transition-jira-tasks-by-query@v2.0.0"
 
-function Write-IssueListOutput {
+Function Write-IssueListOutput {
   Param (
       [string]$name, 
       [string[]]$issueKeys, 
@@ -209,7 +209,7 @@ try {
     }
 
     If ($successfulyProcessedIssueKeys.Length -gt 0) {
-        Write-Output "::notice title=$MESSAGE_TITLE::$($successfulyProcessedIssueKeys -join ', ') successfully processed and/or transitioned to [$TransitionName]"
+        Write-Output "::notice title=$MESSAGE_TITLE::$($successfulyProcessedIssueKeys -join ', ') successfully processed and transitioned if available to [$TransitionName]"
     }
     
     Exit 0

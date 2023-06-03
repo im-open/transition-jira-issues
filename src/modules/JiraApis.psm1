@@ -1,6 +1,6 @@
 $JIRA_HELP_URL = "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post"
 
-function Invoke-HandleBadRequest {
+Function Invoke-HandleBadRequest {
     Param (
         [hashtable]$content,
         [PSCustomObject]$Issue
@@ -26,7 +26,7 @@ function Invoke-HandleBadRequest {
       $content | ConvertTo-Json -Depth 10)" | Write-Warning
 }
 
-function Get-AuthorizationHeaders {
+Function Get-AuthorizationHeaders {
     [OutputType([hashtable])]
     Param (
         [string]$Username,
@@ -50,7 +50,7 @@ function Get-AuthorizationHeaders {
     return @{Authorization = ("Basic {0}" -f $base64AuthInfo) }
 }
 
-function Invoke-JiraApi {
+Function Invoke-JiraApi {
     [OutputType([PSCustomObject])]
     Param (
         [Uri]$Uri,
@@ -84,7 +84,7 @@ function Invoke-JiraApi {
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-get
-function Get-JiraIssuesByQuery {
+Function Get-JiraIssuesByQuery {
     [OutputType([PSCustomObject[]])]
     Param (
         [hashtable]$AuthorizationHeaders,
@@ -138,7 +138,7 @@ function Get-JiraIssuesByQuery {
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-get
-function Get-JiraIssue {
+Function Get-JiraIssue {
   [OutputType([PSCustomObject])]
   Param (
       [hashtable]$AuthorizationHeaders,
@@ -178,7 +178,7 @@ function Get-JiraIssue {
 # https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-put
 # Eventhough its API shows it can transition an issue, it doesn't work for some reason.
 # Thus we use the Transition endpoint instead for that use case.
-function Edit-JiraTicket {
+Function Edit-JiraTicket {
   [OutputType([bool])]
   Param (
     [hashtable]$AuthorizationHeaders = @{},
@@ -234,7 +234,7 @@ function Edit-JiraTicket {
 # Can only transition if all required fields are set (this is setup within Jira)
 # Can only update a field if it is on the transition screen. 
 # Thus its better to update fields in a seperate call to the edit issue endpoint
-function Push-JiraTicketTransition {
+Function Push-JiraTicketTransition {
     [OutputType([bool])]
     Param (
         [hashtable]$AuthorizationHeaders = @{},
@@ -290,7 +290,7 @@ function Push-JiraTicketTransition {
     throw [JiraHttpRequesetException]::new("Failed transitioning Jira Issue [$issueKey] to transition ID [$TransitionId]", $issueUri, $response)
 }
 
-function New-JiraHistoryMetadata {
+Function New-JiraHistoryMetadata {
   [OutputType([PSCustomObject])]
   Param (
       [string]$ActionType,
@@ -316,7 +316,7 @@ function New-JiraHistoryMetadata {
   }
 }
 
-function New-Comment {
+Function New-Comment {
   Param (
     [string]$Comment
   )

@@ -90,8 +90,11 @@ runs:
       id: transition
       shell: pwsh
       env:
+        ISSUES: ${{ inputs.issues }}
         FIELDS: ${{ inputs.update-fields }}
         UPDATES: ${{ inputs.process-operations }}
+        COMMENT: ${{ inputs.comment }}
+        QUERY: ${{ inputs.jql-query }}
       run: |
         If ([string]::IsNullOrEmpty("${{ inputs.jira-username }}")) {
           Write-Output "::error::Jira username is required"
@@ -104,12 +107,10 @@ runs:
         }
         
         Write-Output "::add-mask::${{ inputs.jira-password }}"
-        [System.Security.SecureString] $securePassword = ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force
+        $securePassword = ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force
         
-        $JqlToQueryBy = "${{ inputs.jql-query }}".Trim()
-        $IssueList = "${{ inputs.issues }}".Trim()
-        
-        $IssueKeys = @($issueList -split "\n") -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+        $JqlToQueryBy = $env:QUERY.Trim()
+        $IssueKeys = @($env:ISSUES -split "`n") -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
         $Fields = $env:FIELDS | ConvertFrom-Json -AsHashtable
         $Updates = $env:UPDATES | ConvertFrom-Json -AsHashtable
         
@@ -120,7 +121,7 @@ runs:
           -TransitionName "${{ inputs.transition-name }}" `
           -Fields $Fields `
           -Updates $Updates `
-          -Comment "${{ inputs.comment }}" `
+          -Comment $env:COMMENT `
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword `
           -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
