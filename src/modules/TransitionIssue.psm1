@@ -228,6 +228,7 @@ Function Invoke-JiraTransitionTicket {
     catch [JiraInaccessibleException] {
         $resultType = [TransitionResultType]::Failed
         if ($safeFailIfJiraInaccessible) { throw }
+        
         $resultType = [TransitionResultType]::Skipped
         Write-Warning "[$($issue.key)] Unable to continue transitioning. Skipping!"
         Write-Warning $_.Exception.MessageWithResponse()

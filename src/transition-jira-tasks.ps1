@@ -13,7 +13,7 @@ param (
     [securestring]$JiraPassword,
     [switch]$MissingTransitionAsSuccessful = $false,
     [switch]$FailOnTransitionFailure = $false,
-    [switch]$FailIfNotFoundIssue = $false,
+    [switch]$FailIfIssueNotFound = $false,
     [switch]$FailIfJiraInaccessible = $false,
     [switch]$Debug = $false
 )
@@ -42,6 +42,7 @@ Function Write-IssueListOutput {
 
     $issueKeysAsString = $issueKeys -join ', '
     "$name=$issueKeysAsString" >> $env:GITHUB_OUTPUT
+    "has_$name=$($issueKeys.Length -gt 0)" >> $env:GITHUB_OUTPUT
 
     If ([string]::IsNullOrEmpty($message)) { return }
     If ($conditional -And $issueKeys.Length -eq 0) { return }
@@ -150,21 +151,22 @@ try {
     $transitionedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Success } | ForEach-Object { $_.Key })
     $skippedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Skipped } | ForEach-Object { $_.Key })
     $unavailableTransitionIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Unavailable } | ForEach-Object { $_.Key })
+    $notFoundIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }) : @()
     
     $successfulyProcessedIssueKeys = $transitionedIssueKeys + $skippedIssueKeys
     
     If ($MissingTransitionAsSuccessful -And $unavailableTransitionIssueKeys.Length -gt 0) {
-        Write-Information "Issues missing transition will be treated as a successful transition!"
+        Write-Information "Issues missing transition will be treated as successful!"
         $successfulyProcessedIssueKeys += $unavailableTransitionIssueKeys
     }
-
     $failedIssueKeys = @($identifiedIssueKeys | Where-Object { $successfulyProcessedIssueKeys -notcontains $_ })
-    $notFoundIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }) : @()
 
     # Outputs
     # ------------  
-    Write-IssueListOutput -name "processedIssues" -issueKeys $successfulyProcessedIssueKeys -message "All successfully processed transitions" -debug
+    "isSuccessful=$($failedIssueKeys.Length -eq 0 -And !($FailIfIssueNotFound -And $notFoundIssueKeys.Length -gt 0))" >> $env:GITHUB_OUTPUT
+
     Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues attempted to transition"
+    Write-IssueListOutput -name "processedIssues" -issueKeys $successfulyProcessedIssueKeys -message "All successfully processed transitions" -debug
     Write-IssueListOutput -name "transitionedIssues" -issueKeys $transitionedIssueKeys -message "Issues transitioned"
     Write-IssueListOutput -name "failedIssues" -issueKeys $failedIssueKeys -message "Issues unable to be transitioned"
     Write-IssueListOutput -name "unavailableTransitionIssues" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step" -conditional
@@ -185,13 +187,13 @@ try {
 
     If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
         Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See action [$env:GITHUB_ACTION_URL] for additional help."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See job logs for details and action [$env:GITHUB_ACTION_URL] for additional help."
         Exit 1
     }
 
     If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure) {
         Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See action [$env:GITHUB_ACTION_URL] for additional help."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job logs for details and action [$env:GITHUB_ACTION_URL] for additional help."
     }
 
     If ($unavailableTransitionIssueKeys.Length -gt 0 -And !$MissingTransitionAsSuccessful) {
@@ -199,19 +201,15 @@ try {
       Exit 1
     }
 
-    If ($notFoundIssueKeys.Length -gt 0 -And $FailIfNotFoundIssue) {
+    If ($notFoundIssueKeys.Length -gt 0 -And $FailIfIssueNotFound) {
         Write-Output "::error title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
         Exit 1
     }
 
-    If ($notFoundIssueKeys.Length -gt 0 -And !$FailIfNotFoundIssue) {
+    If ($notFoundIssueKeys.Length -gt 0 -And !$FailIfIssueNotFound) {
         Write-Output "::warning title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
     }
 
-    If ($successfulyProcessedIssueKeys.Length -gt 0) {
-        Write-Output "::notice title=$MESSAGE_TITLE::$($successfulyProcessedIssueKeys -join ', ') successfully processed and transitioned if available to [$TransitionName]"
-    }
-    
     Exit 0
 }
 catch {

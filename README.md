@@ -40,14 +40,17 @@ This action requires access to our on-prem network for accesss to the Jira serve
 
 ## Outputs
 
-| Output                | Description                                                                                |
-|-----------------------|--------------------------------------------------------------------------------------------|
-| `identified-issues`   | Issues found in Jira using the `jql-query` or `issues` input.                              |
-| `processed-issues`    | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition. |
-| `transitioned-issues` | Issues successfully transitioned.                                                          |
-| `unavailable-issues`  | Issues missing the specificed transition.                                                  |
-| `failed-issues`       | Issues identified but not successfully processed.                                          |
-| `not-found-issues`    | Issues that were not found.                                                                |
+| Output               | Description                                                                                | Type                 |
+|----------------------|--------------------------------------------------------------------------------------------|----------------------|
+| `processed-issues`   | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition. | Comma-delimited list |
+| `failed-issues`      | Issues in Jira not successfully processed.                                                 | Comma-delimited list |
+| `unavailable-issues` | Issues missing the specificed transition.                                                  | Comma-delimited list |
+| `not-found-issues`   | Issues not found in Jira.                                                                  | Comma-delimited list |
+| `is-successful`      | One or more issues were transitioned successfully.                                         | Boolean              |
+| `some-identified`    | Some issues were found in Jira.                                                            | Boolean              |
+| `some-unavailable`   | Some issues do not have transition.                                                        | Boolean              |
+| `some-skipped`       | Some issues skipped when already transitioned or other causes.                             | Boolean              |
+| `some-not-found`     | Some issues were not found in Jira.                                                        | Boolean              |
 
 ## Example
 

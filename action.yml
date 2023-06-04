@@ -58,30 +58,47 @@ inputs:
     description: The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored.
     required: true
     
-outputs:
-  identified-issues:
-    description: Issues found in JIra using the 'jql-query' or 'issues' input.
-    value: ${{ steps.transition.outputs.identifiedIssues }}
+  create-notice:
+    description: Add notification to runner with details about successful transitioned issues. 
+    required: false
+    default: 'true'
     
+outputs:
   processed-issues:
     description: Issues successfully transitioned, skipped or (if enabled) unavailable.
     value: ${{ steps.transition.outputs.processedIssues }}
     
-  transitioned-issues:
-    description: Issues successfully transitioned.
-    value: ${{ steps.transition.outputs.transitionedIssues }}
+  failed-issues:
+    description: Issues in Jira not successfully processed.
+    value: ${{ steps.transition.outputs.failedIssues }}
     
   unavailable-issues:
     description: Issues missing the specificed transition.
     value: ${{ steps.transition.outputs.unavailableTransitionIssues }}
   
-  failed-issues:
-    description: Issues identified but not successfully processed.
-    value: ${{ steps.transition.outputs.failedIssues }}
-    
   not-found-issues:
-    description: Issues not found.
+    description: Issues not found in Jira.
     value: ${{ steps.transition.outputs.notfoundIssues }}
+    
+  is-successful:
+    description: One or more issues were transitioned successfully.
+    value: ${{ steps.transition.outputs.isSuccessful }}
+    
+  some-identified:
+    description: Some issues were found in Jira.
+    value: ${{ steps.transition.outputs.has_identifiedIssues }}
+    
+  some-unavailable:
+    description: Some issues do not have transition.
+    value: ${{ steps.transition.outputs.has_unavailableTransitionIssues }}
+    
+  some-skipped:
+    description: Some issues skipped when already transitioned or other causes.
+    value: ${{ steps.transition.outputs.has_skippedIssues }}
+    
+  some-not-found:
+    description: Some issues were not found in Jira.
+    value: ${{ steps.transition.outputs.has_notfoundIssues }}
 
 runs:
   using: 'composite'
@@ -126,5 +143,11 @@ runs:
           -JiraPassword $securePassword `
           -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
           -FailOnTransitionFailure:$${{ (inputs.fail-on-transition-failure == 'true' && 'true') || 'false' }} `
-          -FailIfNotFoundIssues:$${{ (inputs.fail-if-issue-not-found == 'true' && 'true') || 'false' }} `
+          -FailIfIssueNotFound:$${{ (inputs.fail-if-issue-not-found == 'true' && 'true') || 'false' }} `
           -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 
+        
+    - name: Add notice
+      if: ${{ inputs.create-notice == 'true' && steps.transition.outputs.isSuccessful == 'true' }}
+      shell: pwsh
+      run: |
+        Write-Output "::notice title=Jira Ticket Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned (if available) to [${{ inputs.transition-name }}]" 
