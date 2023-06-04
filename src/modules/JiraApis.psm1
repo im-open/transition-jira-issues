@@ -1,13 +1,11 @@
-$JIRA_HELP_URL = "https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post"
-
 Function Invoke-HandleBadRequest {
     Param (
         [hashtable]$content,
         [PSCustomObject]$Issue
     )
-  
+    
     If ($content.errorMessages.Count -eq 0) {
-        $content.errorMessages = "Error on Transition. See $( $env:GITHUB_ACTION_URL ?? $JIRA_HELP_URL ) for help."
+        $content.errorMessages = "Error on Transition. See $( $env:GITHUB_ACTION_URL ) for help."
     }
   
     $fieldIdToName = @{}
@@ -21,8 +19,10 @@ Function Invoke-HandleBadRequest {
     If ($fieldIdToName.Count -gt 0) {
         $content.Add("names", $fieldIdToName)
     }
-  
-    "[$issueKey] Unable to transition issue [$issueUri] due to $( $response.StatusDescription ). See errors: $( `
+    
+    $baseUri = ([System.Uri]$Issue.self).GetLeftPart([System.UriPartial]::Authority)
+       
+    "Unable to transition issue [$baseUri/browse/$($Issue.Key)] due to $($response.StatusDescription). See errors: $( `
       $content | ConvertTo-Json -Depth 10)" | Write-Warning
 }
 
@@ -190,7 +190,7 @@ Function Edit-JiraTicket {
   $issueKey = $Issue.key
   $issueUri = $Issue.self
 
-  If ([string]::IsNullOrEmpty($Issue.self)) {
+  If ([string]::IsNullOrEmpty($issueUri)) {
     throw "[$issueKey] Issue Uri is null or missing"
   }
 
@@ -248,7 +248,7 @@ Function Push-JiraTicketTransition {
     $issueKey = $Issue.key
     $issueUri = $Issue.self
 
-    If ([string]::IsNullOrEmpty($Issue.self)) {
+    If ([string]::IsNullOrEmpty($issueUri)) {
       throw "[$issueKey] Issue Uri is null or missing"
     }
     

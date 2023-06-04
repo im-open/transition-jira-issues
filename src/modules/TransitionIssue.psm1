@@ -199,23 +199,24 @@ Function Invoke-JiraTransitionTicket {
             # Include status names with possible transitions
             $transitionIdLookup[$transition.to.name] = $transition.id
         }
-    
+        $transitionToNames = $Issue.transitions | Select-Object -ExpandProperty to | Select-Object -ExpandProperty name
+        
         If ($issueStatus -ieq $TransitionName) {
-            "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($transitionIdLookup.Keys -join ', ')" `
-              | Write-Warning
+            "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($transitionToNames -join ', ')" `
+              | Write-Information
     
             return [TransitionResultType]::Skipped 
         }
     
         $transitionId = $transitionIdLookup[$TransitionName]
         If ($null -eq $transitionId) {
-            "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($transitionIdLookup.Keys -join ', ')" `
-              | Write-Warning 
+            "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($transitionToNames -join ', ')" `
+              | Write-Information 
     
             return [TransitionResultType]::Unavailable
         }
         
-        Write-Information "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
+        Write-Debug "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
     
         $processed = Push-JiraTicketTransition `
           -AuthorizationHeaders $AuthorizationHeaders `
