@@ -59,6 +59,15 @@ jobs:
   transition-jira-ticket:
     runs-on: ubuntu-20.04
     steps:
+
+      - name: Get work items
+        uses: im-open/get-work-items-action@latest
+        id: get-issues
+        with:
+          create-env-variable: true
+          reference: v1.2.3
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Transition Jira Ticket to Deployed Status
         # You may also reference just the major or major.minor version
         uses: im-open/transition-jira-tasks-by-query@v2.0.0
@@ -69,9 +78,10 @@ jobs:
           domain-name: jira.com
           transition-name: Deployed
           
-          jql-query: 'issuekey=PROJ-12345'
+          issues: ${{ steps.get-issues.outputs.result-list }}
+          # jql-query: 'issuekey=PROJ-12345'
           # jql-query: "filter='My Filter Name' AND issuekey=PROJ-12345"
-          # jql-query: 'component IN ("System Infrastructure') AND 'Deployment Version' ~ 'v1.2.1''
+          # jql-query: 'component IN ("System Infrastructure') AND "Deployment Version" ~ 'v1.2.1''
           # issues: TW-1234, TW-4455
           # issues: |
           #   TW-1234
