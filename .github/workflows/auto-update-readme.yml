@@ -47,7 +47,7 @@ jobs:
           action-name:  ${{ github.repository }}
           updated-version: ${{ steps.version.outputs.NEXT_VERSION }}
           
-      - name: Update readme with next version if there are code changes to the action
+      - name: Update repo reference in script to next version if there are code changes to the action
         if: steps.action-code.outputs.HAS_CHANGES == 'true'
         uses: im-open/update-action-version-in-file@v1.0.0
         with:

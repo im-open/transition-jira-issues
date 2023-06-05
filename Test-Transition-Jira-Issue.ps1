@@ -14,17 +14,17 @@ using module "./src/modules/TransitionIssue.psm1"
   .PARAMETER transition
   Jira transition name 
 
-  .PARAMETER extendhealth-username
-  Your ExtendHealth Jira username.
+  .PARAMETER username
+  Your Jira username.
 
-  .PARAMETER extendhealth-login
-  Your ExtendHealth Jira password.
+  .PARAMETER login
+  Your Jira password.
 
   .PARAMETER jira-base-uri
-  Jira domain. Defaults to https://jira.extendhealth.com
+  Jira domain.
 
   .INPUTS
-  None. You cannot pipe objects to Update-Month.ps1.
+  None. You cannot pipe objects.
 
   .OUTPUTS
   Jira details as JSON 
@@ -47,14 +47,14 @@ param (
     
     [string]$Comment,
 
-    [Alias("extendhealth-username")]
+    [Alias("username")]
     [string]$Username,
 
-    [Alias("extendhealth-login")]
+    [Alias("login")]
     [string]$Login,
 
     [Alias("jira-base-uri")]
-    [string]$JiraBaseUri = "https://jira.extendhealth.com",
+    [string]$JiraBaseUri,
 
     [switch]$Debug = $false
 )

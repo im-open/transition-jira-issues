@@ -81,7 +81,7 @@ outputs:
     value: ${{ steps.transition.outputs.notfoundIssues }}
     
   is-successful:
-    description: One or more issues were transitioned successfully.
+    description: One or more issues were transitioned successfully and/or skipped.
     value: ${{ steps.transition.outputs.isSuccessful }}
     
   some-identified:

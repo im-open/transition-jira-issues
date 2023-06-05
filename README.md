@@ -4,7 +4,7 @@ This GitHub Action will query Jira using JQL provided as an input, and will tran
 
 ## Requirements
 
-This action requires access to our on-prem network for accesss to the Jira servers.  You must run the action with a `self-hosted` or `coldstone` runner.
+If the Jira server is hosted on an internal network, then the action must run on a runner that has access to that network.
 
 ## Index
 
@@ -40,17 +40,17 @@ This action requires access to our on-prem network for accesss to the Jira serve
 
 ## Outputs
 
-| Output               | Description                                                                                | Type                 |
-|----------------------|--------------------------------------------------------------------------------------------|----------------------|
-| `processed-issues`   | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition. | Comma-delimited list |
-| `failed-issues`      | Issues in Jira not successfully processed.                                                 | Comma-delimited list |
-| `unavailable-issues` | Issues missing the specificed transition.                                                  | Comma-delimited list |
-| `not-found-issues`   | Issues not found in Jira.                                                                  | Comma-delimited list |
-| `is-successful`      | One or more issues were transitioned successfully.                                         | Boolean              |
-| `some-identified`    | Some issues were found in Jira.                                                            | Boolean              |
-| `some-unavailable`   | Some issues do not have transition.                                                        | Boolean              |
-| `some-skipped`       | Some issues skipped when already transitioned or other causes.                             | Boolean              |
-| `some-not-found`     | Some issues were not found in Jira.                                                        | Boolean              |
+| Output               | Description                                                                                                                                           | Type                 |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|
+| `processed-issues`   | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition.                                                            | Comma-delimited list |
+| `failed-issues`      | Issues in Jira not successfully processed.                                                                                                            | Comma-delimited list |
+| `unavailable-issues` | Issues missing the specificed transition.                                                                                                             | Comma-delimited list |
+| `not-found-issues`   | Issues not found in Jira.                                                                                                                             | Comma-delimited list |
+| `is-successful`      | One or more issues were transitioned successfully and/or skipped. _If `missing-transition-as-successful` enabled, also includes missing transitions._ | Boolean              |
+| `some-identified`    | Some issues were found in Jira.                                                                                                                       | Boolean              |
+| `some-unavailable`   | Some issues do not have transition.                                                                                                                   | Boolean              |
+| `some-skipped`       | Some issues skipped when already transitioned or other causes.                                                                                        | Boolean              |
+| `some-not-found`     | Some issues were not found in Jira.                                                                                                                   | Boolean              |
 
 ## Example
 
@@ -101,7 +101,7 @@ jobs:
 
 They are two different ways to update fields.  Passing a `update-fields` input or an `process-operations` input. You may not specify the same field name in both the `update-fields` and `process-operations` inputs.
 
-If you are unsure what field names to use, run the [Get-Jira-Issue](../main/Test-Get-Jira-Issue.ps1) script locally from your machine using your ExtendHealth username and password.
+If you are unsure what field names to use, run the [Get-Jira-Issue](../main/Test-Get-Jira-Issue.ps1) script locally.
 
 > You may also use the field's display name
 

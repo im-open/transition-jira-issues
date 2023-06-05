@@ -8,7 +8,7 @@ param (
     [hashtable]$Fields = @{},
     [hashtable]$Updates = @{},
     [string]$Comment,
-    [string]$JiraDomain = "jira.extendhealth.com",
+    [string]$JiraDomain,
     [string]$JiraUsername,
     [securestring]$JiraPassword,
     [switch]$MissingTransitionAsSuccessful = $false,
