@@ -33,9 +33,11 @@ using module "./src/modules/TransitionIssue.psm1"
   PS> .\Test-Transition-Jira-Issue.ps1 -issue ABC-1234 -transition "In Progress" -username Joe -password 1234
 #>
 param (
+    [Parameter(Mandatory=$true)]
     [Alias("issue")]
     [string]$IssueKey,
 
+    [Parameter(Mandatory=$true)]
     [Alias("transition")]
     [string]$TransitionName,
 
@@ -47,21 +49,19 @@ param (
     
     [string]$Comment,
 
-    [Alias("username")]
+    [Parameter(Mandatory=$true)]
     [string]$Username,
 
-    [Alias("login")]
+    [Parameter(Mandatory=$true)]
     [string]$Login,
 
+    [Parameter(Mandatory=$true)]
     [Alias("jira-base-uri")]
-    [string]$JiraBaseUri,
-
-    [switch]$Debug = $false
+    [string]$JiraBaseUri
 )
 
 $global:InformationPreference = "Continue"
-$isDebug = $env:RUNNER_DEBUG -eq "1" -Or $Debug
-$global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
+$global:DebugPreference = $DebugPreference
 
 try {
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
@@ -98,5 +98,4 @@ finally {
   Remove-Module JiraApis
   Remove-Module TransitionIssue
   $global:InformationPreference = "SilentlyContinue"
-  $global:DebugPreference = "SilentlyContinue"
 }

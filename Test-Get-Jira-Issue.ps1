@@ -30,24 +30,23 @@ using module "./src/modules/JiraApis.psm1"
 #>
 
 param (
+    [Parameter(Mandatory=$true)]
     [Alias("issue")]
     [string]$IssueKey,
 
-    [Alias("username")]
+    [Parameter(Mandatory=$true)]
     [string]$Username,
 
-    [Alias("login")]
+    [Parameter(Mandatory=$true)]
     [string]$Login,
 
+    [Parameter(Mandatory=$true)]
     [Alias("jira-base-uri")]
-    [string]$JiraBaseUri,
-
-    [switch]$Debug = $false
+    [string]$JiraBaseUri
 )
 
 $global:InformationPreference = "Continue"
-$isDebug = $env:RUNNER_DEBUG -eq "1" -Or $Debug
-$global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
+$global:DebugPreference = $env:RUNNER_DEBUG -eq "1" ? "Continue" : $DebugPreference
 
 try {
   [System.Security.SecureString] $securePassword = ConvertTo-SecureString $Login -AsPlainText -Force
