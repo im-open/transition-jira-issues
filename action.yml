@@ -1,35 +1,153 @@
 name: Transition Jira Tasks by Query
-
 description: Performs the given JQL query to find tickets and transition them to the given status.
 
 inputs:
   domain-name:
-    description: 'The domain name for Jira.'
+    description: The domain name for Jira.
     required: true
+    
   jql-query:
-    description: 'The JQL query to use to find tickets that will be transitioned.'
-    required: true
+    description: The JQL query to use to find tickets that will be transitioned. If provided, will override any issues passed in the 'issues' input.
+    required: false
+    
+  issues:
+    description: Comma delimited list of issues to transition.
+    required: false
+    
   transition-name:
-    description: 'The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.'
+    description: The name of the transition to perform. Examples might include Open, In Progress, Deployed, etc.
     required: true
+
+  update-fields:
+    description: A map of issue screen fields to overwrite, specifying the sub-field to update and its value for each field. When multiple sub-fields or other operations are required, use 'update' input instead.
+    required: false
+    
+  process-operations: 
+    description: A map containing the field name and a list of operations to perform. The fields included in here cannot be included in 'fields' input.
+    required: false
+    
+  comment:
+    description: Add a comment to the ticket after the transition
+    required: false
+
+  missing-transition-as-successful:
+    description: Mark as a successful if issue is missing the transition.
+    required: false
+    default: 'true'
+      
+  fail-on-transition-failure:
+    description: Fail if some issues failed transitioning.
+    required: false
+    default: 'true'
+    
+  fail-if-issue-not-found:
+    description: Fail if some issues are not found.
+    required: false
+    default: 'true'
+
+  fail-if-jira-inaccessible:
+    description:  Fail if Jira is inaccessible at the moment. Sometimes Jira is done but shouldn't block the pipeline.
+    required: false
+    default: 'false'
+    
   jira-username:
-    description: 'The username to login to Jira with in order to perform the transition. Will be ignored if not set.'
-    required: false
+    description: The username to login to Jira with in order to perform the transition. Will be ignored if not set.
+    required: true
+    
   jira-password:
-    description: 'The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored.'
+    description: The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored.
+    required: true
+    
+  create-notice:
+    description: Add notification to runner with details about successful transitioned issues. 
     required: false
+    default: 'true'
+    
+outputs:
+  processed-issues:
+    description: Issues successfully transitioned, skipped or (if enabled) unavailable.
+    value: ${{ steps.transition.outputs.processedIssues }}
+    
+  failed-issues:
+    description: Issues in Jira not successfully processed.
+    value: ${{ steps.transition.outputs.failedIssues }}
+    
+  unavailable-issues:
+    description: Issues missing the specificed transition.
+    value: ${{ steps.transition.outputs.unavailableTransitionIssues }}
+  
+  not-found-issues:
+    description: Issues not found in Jira.
+    value: ${{ steps.transition.outputs.notfoundIssues }}
+    
+  is-successful:
+    description: One or more issues were transitioned successfully and/or skipped.
+    value: ${{ steps.transition.outputs.isSuccessful }}
+    
+  some-identified:
+    description: Some issues were found in Jira.
+    value: ${{ steps.transition.outputs.has_identifiedIssues }}
+    
+  some-unavailable:
+    description: Some issues do not have transition.
+    value: ${{ steps.transition.outputs.has_unavailableTransitionIssues }}
+    
+  some-skipped:
+    description: Some issues skipped when already transitioned or other causes.
+    value: ${{ steps.transition.outputs.has_skippedIssues }}
+    
+  some-not-found:
+    description: Some issues were not found in Jira.
+    value: ${{ steps.transition.outputs.has_notfoundIssues }}
 
 runs:
   using: 'composite'
   steps:
     - name: Transition Jira Tickets
+      id: transition
       shell: pwsh
+      env:
+        ISSUES: ${{ inputs.issues }}
+        FIELDS: ${{ inputs.update-fields }}
+        UPDATES: ${{ inputs.process-operations }}
+        COMMENT: ${{ inputs.comment }}
+        QUERY: ${{ inputs.jql-query }}
       run: |
-        [System.Security.SecureString] $securePassword = if(!!"${{ inputs.jira-password }}") { ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force } else { $null }
-
+        If ([string]::IsNullOrEmpty("${{ inputs.jira-username }}")) {
+          Write-Output "::error::Jira username is required"
+          exit 1
+        }
+        
+        If ([string]::IsNullOrEmpty("${{ inputs.jira-password }}")) {
+          Write-Output "::error::Jira password is required"
+          exit 1
+        }
+        
+        Write-Output "::add-mask::${{ inputs.jira-password }}"
+        $securePassword = ConvertTo-SecureString "${{ inputs.jira-password }}" -AsPlainText -Force
+        
+        $JqlToQueryBy = $env:QUERY.Trim()
+        $IssueKeys = @($env:ISSUES -split "`n") -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
+        $Fields = $env:FIELDS | ConvertFrom-Json -AsHashtable
+        $Updates = $env:UPDATES | ConvertFrom-Json -AsHashtable
+        
         ${{ github.action_path }}/src/transition-jira-tasks.ps1 `
           -JiraDomain "${{ inputs.domain-name }}" `
-          -JqlToQueryBy "${{ inputs.jql-query }}" `
-          -NewState "${{ inputs.transition-name }}" `
+          -JqlToQueryBy $JqlToQueryBy `
+          -IssueKeys $IssueKeys `
+          -TransitionName "${{ inputs.transition-name }}" `
+          -Fields $Fields `
+          -Updates $Updates `
+          -Comment $env:COMMENT `
           -JiraUsername "${{ inputs.jira-username }}" `
-          -JiraPassword $securePassword
+          -JiraPassword $securePassword `
+          -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
+          -FailOnTransitionFailure:$${{ (inputs.fail-on-transition-failure == 'true' && 'true') || 'false' }} `
+          -FailIfIssueNotFound:$${{ (inputs.fail-if-issue-not-found == 'true' && 'true') || 'false' }} `
+          -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 
+        
+    - name: Add notice
+      if: ${{ inputs.create-notice == 'true' && steps.transition.outputs.isSuccessful == 'true' }}
+      shell: pwsh
+      run: |
+        Write-Output "::notice title=Jira Ticket Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned (if available) to [${{ inputs.transition-name }}]" 

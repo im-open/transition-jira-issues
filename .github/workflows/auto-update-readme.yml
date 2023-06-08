@@ -46,6 +46,14 @@ jobs:
           file-to-update: './README.md'
           action-name:  ${{ github.repository }}
           updated-version: ${{ steps.version.outputs.NEXT_VERSION }}
+          
+      - name: Update repo reference in script to next version if there are code changes to the action
+        if: steps.action-code.outputs.HAS_CHANGES == 'true'
+        uses: im-open/update-action-version-in-file@v1.0.0
+        with:
+          file-to-update: './src/transition-jira-tasks.ps1'
+          action-name: ${{ github.repository }}
+          updated-version: ${{ steps.version.outputs.NEXT_VERSION }}
 
       - name: Commit unstaged readme changes if there are code changes to the action
         if: steps.action-code.outputs.HAS_CHANGES == 'true'
