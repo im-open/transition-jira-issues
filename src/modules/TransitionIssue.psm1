@@ -137,7 +137,7 @@ Function Get-ReducedUpdates {
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
-Function Invoke-JiraTransitionTicket {
+Function Invoke-JiraTransitionIssue {
     [OutputType([TransitionResultType])]
     Param (
         [hashtable]$AuthorizationHeaders,
@@ -180,7 +180,7 @@ Function Invoke-JiraTransitionTicket {
             $fieldIdLookup[$field.Value.name] = $id
         }
 
-        $edited = Edit-JiraTicket `
+        $edited = Edit-JiraIssue `
           -AuthorizationHeaders $AuthorizationHeaders `
           -Issue $Issue `
           -Fields (Get-ReducedFields -Fields $Fields -Issue $Issue -FieldIdLookup $fieldIdLookup) `
@@ -218,7 +218,7 @@ Function Invoke-JiraTransitionTicket {
         
         Write-Debug "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
     
-        $processed = Push-JiraTicketTransition `
+        $processed = Push-JiraIssueTransition `
           -AuthorizationHeaders $AuthorizationHeaders `
           -Issue $Issue `
           -TransitionId $transitionId `
@@ -239,4 +239,4 @@ Function Invoke-JiraTransitionTicket {
     return $resultType
 }
 
-Export-ModuleMember -Function Invoke-JiraTransitionTicket
+Export-ModuleMember -Function Invoke-JiraTransitionIssue

@@ -1,6 +1,6 @@
-# transition-jira-tasks-by-query
+# transition-jira-issues
 
-This GitHub Action will query Jira using JQL provided as an input, and will transition any tickets it finds to a given status.
+This GitHub Action will query Jira using JQL provided as an input, and will transition any issues it finds to a given status.
 
 ## Requirements
 
@@ -8,7 +8,7 @@ If the Jira server is hosted on an internal network, then the action must run on
 
 ## Index
 
-- [transition-jira-tasks-by-query](#transition-jira-tasks-by-query)
+- [transition-jira-issues](#transition-jira-issues)
   - [Index](#index)
   - [Inputs](#inputs)
   - [Example](#example)
@@ -19,16 +19,17 @@ If the Jira server is hosted on an internal network, then the action must run on
 
 
 ## Inputs
+Work items, tickets, etc. are referenced as "issues" in this action.
 
 | Parameter                          | Is Required    | Description                                                                                                                                                                                                                      |
 |------------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `domain-name`                      | true           | The domain name for Jira.                                                                                                                                                                                                        |
-| `jql-query`                        | conditionally* | The JQL query to use to find tickets that will be transitioned. A max of 20 issues can be transitioned.                                                                                                                          |
+| `jql-query`                        | conditionally* | The JQL query to use to find issues that will be transitioned. A max of 20 issues can be transitioned.                                                                                                                          |
 | `issues`                           | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                              |
 | `transition-name`                  | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                |
 | `update-fields`                    | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'process-operations' input instead. |
 | `process-operations`               | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'update-fields' input._                                                                     |
-| `comment`                          | false          | Add a comment to the ticket after the transition.                                                                                                                                                                                |
+| `comment`                          | false          | Add a comment to the issue after the transition.                                                                                                                                                                                |
 | `missing-transition-as-successful` | false          | Mark as a successful if issue is missing the transition. _`true` by default._                                                                                                                                                    |
 | `fail-on-transition-failure`       | false          | Fail if some issues failed transitioning. _`true` by default._                                                                                                                                                                   |
 | `fail-if-issue-not-found`          | false          | Fail if some issues are not found that are listed in the `issues` input. _`true` by default._                                                                                                                                    |
@@ -56,7 +57,7 @@ If the Jira server is hosted on an internal network, then the action must run on
 
 ```yml
 jobs:
-  transition-jira-ticket:
+  transition-jira-issue:
     runs-on: ubuntu-20.04
     steps:
 
@@ -68,9 +69,9 @@ jobs:
           reference: v1.2.3
           github-token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Transition Jira Ticket to Deployed Status
+      - name: Transition Jira Issue to Deployed Status
         # You may also reference just the major or major.minor version
-        uses: im-open/transition-jira-tasks-by-query@v2.0.0
+        uses: im-open/transition-jira-issues@v2.0.0
         id: transition
         with:
           jira-username: ${{ vars.JIRA_USERNAME }}
@@ -97,8 +98,8 @@ jobs:
       # Some issue types don't have a transition status like others.  
       # In those cases, where you want to still transition, a second step will need to be invoked.  
       # You can pass in the `unavailable-issues` output to transition those remaining issues.
-      - name: Transition Remaining Jira Tickets to Closed Status
-        uses: im-open/transition-jira-tasks-by-query@v2.0.0
+      - name: Transition Remaining Jira issues to Closed Status
+        uses: im-open/transition-jira-issues@v2.0.0
         with:
           jira-username: ${{ vars.JIRA_USERNAME }}
           jira-password: ${{ secrets.JIRA_PASSWORD }}
@@ -143,7 +144,7 @@ _The `update-fields` input would be something like:_
 
 ### Update Operations Input
 
-Update fields by operation(s). Adding multiple components, creating a link to another ticket, adding additional values to a multi-select field, etc.  Updating operations allows you to add or remove additional values to fields without overwriting what is already there.
+Update fields by operation(s). Adding multiple components, creating a link to another issue, adding additional values to a multi-select field, etc.  Updating operations allows you to add or remove additional values to fields without overwriting what is already there.
 
 _The `process-operations` fields would be something like:_
 

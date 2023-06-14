@@ -1,5 +1,5 @@
 name: Transition Jira Tasks by Query
-description: Performs the given JQL query to find tickets and transition them to the given status.
+description: Performs the given JQL query to find issues and transition them to the given status.
 
 inputs:
   domain-name:
@@ -7,7 +7,7 @@ inputs:
     required: true
     
   jql-query:
-    description: The JQL query to use to find tickets that will be transitioned. If provided, will override any issues passed in the 'issues' input.
+    description: The JQL query to use to find issues that will be transitioned. If provided, will override any issues passed in the 'issues' input.
     required: false
     
   issues:
@@ -27,7 +27,7 @@ inputs:
     required: false
     
   comment:
-    description: Add a comment to the ticket after the transition
+    description: Add a comment to the issue after the transition
     required: false
 
   missing-transition-as-successful:
@@ -103,7 +103,7 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Transition Jira Tickets
+    - name: Transition Jira issues
       id: transition
       shell: pwsh
       env:
@@ -131,7 +131,7 @@ runs:
         $Fields = $env:FIELDS | ConvertFrom-Json -AsHashtable
         $Updates = $env:UPDATES | ConvertFrom-Json -AsHashtable
         
-        ${{ github.action_path }}/src/transition-jira-tasks.ps1 `
+        ${{ github.action_path }}/src/transition-jira-issues.ps1 `
           -JiraDomain "${{ inputs.domain-name }}" `
           -JqlToQueryBy $JqlToQueryBy `
           -IssueKeys $IssueKeys `
@@ -150,4 +150,4 @@ runs:
       if: ${{ inputs.create-notice == 'true' && steps.transition.outputs.isSuccessful == 'true' }}
       shell: pwsh
       run: |
-        Write-Output "::notice title=Jira Ticket Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned (if available) to [${{ inputs.transition-name }}]" 
+        Write-Output "::notice title=Jira Issue Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned (if available) to [${{ inputs.transition-name }}]" 

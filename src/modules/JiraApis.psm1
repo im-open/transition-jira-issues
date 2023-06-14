@@ -178,7 +178,7 @@ Function Get-JiraIssue {
 # https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-put
 # Eventhough its API shows it can transition an issue, it doesn't work for some reason.
 # Thus we use the Transition endpoint instead for that use case.
-Function Edit-JiraTicket {
+Function Edit-JiraIssue {
   [OutputType([bool])]
   Param (
     [hashtable]$AuthorizationHeaders = @{},
@@ -234,7 +234,7 @@ Function Edit-JiraTicket {
 # Can only transition if all required fields are set (this is setup within Jira)
 # Can only update a field if it is on the transition screen. 
 # Thus its better to update fields in a seperate call to the edit issue endpoint
-Function Push-JiraTicketTransition {
+Function Push-JiraIssueTransition {
     [OutputType([bool])]
     Param (
         [hashtable]$AuthorizationHeaders = @{},
@@ -355,4 +355,4 @@ class JiraHttpRequesetException : System.Net.Http.HttpRequestException {
   }
 }
 
-Export-ModuleMember -Function Push-JiraTicketTransition, Get-JiraTransitionsByIssue, Get-JiraIssuesByQuery, Get-JiraIssue, Edit-JiraTicket, Get-AuthorizationHeaders
+Export-ModuleMember -Function Push-JiraIssueTransition, Get-JiraTransitionsByIssue, Get-JiraIssuesByQuery, Get-JiraIssue, Edit-JiraIssue, Get-AuthorizationHeaders
