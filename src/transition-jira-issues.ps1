@@ -19,7 +19,7 @@ param (
 )
 
 $MAX_ISSUES_TO_TRANSITION = 20
-$MESSAGE_TITLE = "Jira Ticket Transitions"
+$MESSAGE_TITLE = "Jira Issue Transitions"
 
 $global:InformationPreference = "Continue"
 $isDebug = $env:RUNNER_DEBUG -eq "1" -Or $Debug
@@ -28,7 +28,7 @@ $global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
 $throttleLimit = $isDebug ? 1 : $MAX_ISSUES_TO_TRANSITION 
 
 $env:GITHUB_RUNNER_URL = "{0}/{1}/actions/runs/{2}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_RUN_ID 
-$env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, "im-open/transition-jira-tasks-by-query@v2.0.0"
+$env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, "im-open/transition-jira-issues@v2.0.0"
 
 Function Write-IssueListOutput {
   Param (
@@ -119,7 +119,7 @@ try {
         $safeFailIfJiraInaccessible = $using:FailIfJiraInaccessible
        
         try {
-            $resultType = Invoke-JiraTransitionTicket `
+            $resultType = Invoke-JiraTransitionIssue `
               -AuthorizationHeaders $using:AuthorizationHeaders `
               -Issue $issue `
               -TransitionName $safeTranstionName `

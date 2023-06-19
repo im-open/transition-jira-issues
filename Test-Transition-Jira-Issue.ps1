@@ -79,7 +79,7 @@ try {
     exit 1
   }
     
-  $result = Invoke-JiraTransitionTicket `
+  $result = Invoke-JiraTransitionIssue `
     -Issue $issues[0] `
     -TransitionName $TransitionName `
     -Fields $Fields `
@@ -88,11 +88,11 @@ try {
     -AuthorizationHeaders $authorizationHeaders `
 
   If ($result -ne [TransitionResultType]::Success) {
-    Write-Error "Failed to transition ticket to the state [$TransitionName] with a result of [$result]"
+    Write-Error "Failed to transition issue to the state [$TransitionName] with a result of [$result]"
     exit 1
   }
     
-  Write-Information "Successfully transitioned ticket to state [$TransitionName] with a result of [$result]"
+  Write-Information "Successfully transitioned issue to state [$TransitionName] with a result of [$result]"
 }
 finally {
   Remove-Module JiraApis
