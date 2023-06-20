@@ -11,35 +11,39 @@ Enum TransitionResultType {
 Function Get-ReducedFields {
     [OutputType([hashtable])]
     Param (
-      [PSCustomObject]$Issue,
-      [hashtable]$Fields = @{},
-      [hashtable]$FieldIdLookup = @{}
+        [PSCustomObject]$Issue,
+        [hashtable]$FieldChanges = @{},
+        [PSCustomObject[]]$AvailableFields = @()
     )
-
     $issueKey = $Issue.key
-    $issueType = $Issue.fields.issuetype.name
+    $issueType = $Issue.type
+    
     $reducedFields = @{}
-    If ($Fields.Count -eq 0) {
+    If ($FieldChanges.Count -eq 0) {
         return $reducedFields
     }
 
-    ForEach ($field in $Fields.GetEnumerator()) {
-        $fieldId = $FieldIdLookup[$field.Key]
-        If ($null -eq $fieldId) { continue }
+    $unavailableFields = @()
+    ForEach ($field in $FieldChanges.GetEnumerator()) {
+        $fieldId = (Get-FieldByNameOrId -FieldIdOrName $field.Key -Fields $AvailableFields).id
+        If ($null -eq $fieldId) {
+            $unavailableFields += $field.Key
+            Continue
+        }
+        
         $reducedFields[$fieldId] = $field.Value
 
         if ($fieldId -ne $field.Key) {
-          Write-Debug "[$issueKey] Field {$($field.Key)} translated to field ID {$fieldId}"
+            Write-Debug "[$issueKey] Field {$($field.Key)} translated to field ID {$fieldId}"
         }
     }
     
     If ($reducedFields.Count -eq 0) {
-        "[$issueKey] No valid fields were identified for $issueType. No field changes will be applied." `
-          | Write-Debug
+        "[$issueKey] No valid fields were identified for $issueType." `
+          | Write-Warning
         return $reducedFields
     }
 
-    $unavailableFields = $Fields.Keys | Where-Object { !$FieldIdLookup.ContainsKey($_) }
     If ($unavailableFields.Count -gt 0) {
         "[$issueKey] Fields were omitted because they are not valid for the issue: $($unavailableFields -join ', ')" `
           | Write-Debug
@@ -52,38 +56,32 @@ Function Get-ReducedUpdates {
     [OutputType([hashtable])]
     Param (
         [PSCustomObject]$Issue,
-        [hashtable]$Updates = @{},
-        [hashtable]$FieldIdLookup = @{}
+        [hashtable]$UpdateChanges = @{},
+        [PSCustomObject[]]$AvailableFields = @()
     )
-
     $issueKey = $Issue.key
-    $issueType = $Issue.fields.issuetype.name
+    $issueType = $Issue.type
+    
     $reducedUpdates = @{}
-    If ($Updates.Count -eq 0) {
+    If ($UpdateChanges.Count -eq 0) {
         return $reducedUpdates
     }
     
     $unavailableUpdates = @{}
-
-    ForEach ($update in $Updates.GetEnumerator()) {
-        $fieldId = $FieldIdLookup[$update.Key]
-        If ($null -eq $fieldId) {
+    ForEach ($update in $UpdateChanges.GetEnumerator()) {
+        $field = (Get-FieldByNameOrId -FieldIdOrName $update.Key -Fields $AvailableFields)
+        If ($null -eq $field)  {
             $unavailableUpdates["$($update.Key)"] = @()
-            Continue 
+            Continue
         }
-
+        
+        $fieldId = $field.id
         if ($fieldId -ne $update.Key) {
           Write-Debug "[$issueKey] Field {$($update.Key)} translated to field ID {$fieldId}"
         }
 
-        $field = $Issue.editmeta.fields.$fieldId
-        If ($null -eq $field) {
-            $unavailableUpdates["$($update.Key)"] = @()
-            Continue
-        }
         $operationNames = $field.operations
-        
-        If ($operationNames -icontains "set" -And $field.schema.type -eq "string") {
+        If ($operationNames -icontains "set" -And $field.schemaType -eq "string") {
             $operationNames += "append"
         }
         
@@ -105,11 +103,11 @@ Function Get-ReducedUpdates {
             
             # Allow those fields that only have a set and are a string value, to append
             If ($operationName -ieq "append") {
-                $existingValue = $Issue.fields.$fieldId
+                $existingValue = $Issue.fieldValues.$fieldId
                 $appendValue = $operation[$operationName]
                 If ([string]::IsNullOrEmpty($appendValue)) { Continue }
                 
-                $maybeLineBreak = [string]::IsNullOrEmpty($appendValue) ? "" : "`n"
+                $maybeLineBreak = [string]::IsNullOrEmpty($existingValue) ? "" : "`n"
                 $operations += @{
                     "set" = $existingValue + $maybeLineBreak + $appendValue 
                 }
@@ -123,8 +121,8 @@ Function Get-ReducedUpdates {
     }
 
     If ($reducedUpdates.Count -eq 0) {
-        "[$issueKey] No valid update operations were identified for $issueType. No operations will be applied." `
-          | Write-Debug
+        "[$issueKey] No valid update operations were identified for $issueType." `
+          | Write-Warning
         return $reducedUpdates
     }
   
@@ -153,7 +151,8 @@ Function Invoke-JiraTransitionIssue {
     }
     
     $issueKey = $Issue.key
-    $issueStatus = $Issue.fields.status.name
+    $issueStatus = $Issue.status
+    $issueType = $Issue.type
 
     If ([string]::IsNullOrEmpty($issueKey)) {
         throw "[$issueKey] Issue Key is null or missing"
@@ -163,77 +162,96 @@ Function Invoke-JiraTransitionIssue {
         throw "[$issueKey] Issue Status is null or missing"
     }
 
-    $issueType = $Issue.fields.issuetype.name
-    $issueSummary = $Issue.fields.summary
-    $issueLabels = $Issue.fields.labels
-    $issueComponents = $Issue.fields.components
-    
-    Write-Debug "[$issueKey] $issueType : $issueSummary -> processing with labels [$( `
-      $issueLabels -join ', ')] and components [$(@($issueComponents | Select-Object -ExpandProperty name) -join ', ')]"
+    Write-Debug "[$issueKey] $issueType : $($Issue.summary) -> processing with labels [$( `
+      $Issue.labels -join ', ')] and components [$($Issue.componentNames -join ', ')]"
 
     $resultType = [TransitionResultType]::Unknown
     try {
-        $fieldIdLookup = @{}
-        ForEach ($field in $Issue.editmeta.fields.PSObject.Properties) {
-            $id = $field.Value.fieldId
-            $fieldIdLookup[$id] = $id
-            $fieldIdLookup[$field.Value.name] = $id
-        }
+        $availableEditFields = $Issue.fields | Where-Object { $_.isEditable }
+        $editFieldChanges = (Get-ReducedFields -FieldChanges $Fields -Issue $Issue -AvailableFields $availableEditFields)
+        $editUpdateChanges = (Get-ReducedUpdates -UpdateChanges $Updates -Issue $Issue -AvailableFields $availableEditFields)
 
-        $edited = Edit-JiraIssue `
-          -AuthorizationHeaders $AuthorizationHeaders `
-          -Issue $Issue `
-          -Fields (Get-ReducedFields -Fields $Fields -Issue $Issue -FieldIdLookup $fieldIdLookup) `
-          -Updates (Get-ReducedUpdates -Updates $Updates -Issue $Issue -FieldIdLookup $fieldIdLookup)
-
-        If (!$edited) {
-            "[$issueKey] Unable to edit fields for $issueType. Skipping transition!" `
-              | Write-Warning
-
-            return [TransitionResultType]::Failed
+        If ($editFieldChanges.Count -gt 0 -Or $editUpdateChanges.Count -gt 0) {
+          Write-Information "[$issueKey] Changes identified for $issueType. Performing updates prior to transition..."
+            
+          $edited = Edit-JiraIssue `
+            -AuthorizationHeaders $AuthorizationHeaders `
+            -Issue $Issue `
+            -Fields $editFieldChanges `
+            -Updates $editUpdateChanges 
+  
+          If (!$edited) {
+              "[$issueKey] Unable to edit fields for $issueType. Skipping transition!" `
+                | Write-Warning
+  
+              return [TransitionResultType]::Failed
+          }
         }
       
-        $transitionIdLookup = @{}
-        ForEach ($transition in $Issue.transitions) {
-            $transitionIdLookup[$transition.name] = $transition.id
-            # Include status names with possible transitions
-            $transitionIdLookup[$transition.to.name] = $transition.id
-        }
-        $transitionToNames = $Issue.transitions | Select-Object -ExpandProperty to | Select-Object -ExpandProperty name
-        
         If ($issueStatus -ieq $TransitionName) {
-            "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($transitionToNames -join ', ')" `
+            "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($Issue.availableTransitionNames -join ', ')" `
               | Write-Information
     
             return [TransitionResultType]::Skipped 
         }
-    
-        $transitionId = $transitionIdLookup[$TransitionName]
+
+        $transitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $TransitionName }).id
         If ($null -eq $transitionId) {
-            "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($transitionToNames -join ', ')" `
+            $availableTransitionNames = $Issue.transitions | Select-Object -ExpandProperty to | Select-Object -ExpandProperty name
+            
+            "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($availableTransitionNames -join ', ')" `
               | Write-Information 
+    
+            return [TransitionResultType]::Unavailable
+        }
+        If ($transitionId.Count -gt 1) {
+            "[$issueKey] Multiple transitions found for [$TransitionName] on $issueType! Available transitions: $($transitionId -join ', ')" `
+              | Write-Warning
     
             return [TransitionResultType]::Unavailable
         }
         
         Write-Debug "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
-    
+        
+        $transitionFieldChanges = @{}
+        $transitionUpdateChanges = @{}
+        
+        # Some fields are only available for updating during a transition
+        If ($editFieldChanges.Count -ne $Fields.Count -Or $editUpdateChanges.Count -ne $Updates.Count) {
+            $availableTransitionFields = Get-JiraIssueTransitionAvailableFields `
+              -AuthorizationHeaders $AuthorizationHeaders `
+              -Issue $Issue `
+              -TransitionId $transitionId
+            
+            "[$issueKey] Specific transition fields identified. Preparing fields to be used during transition: $(@($availableTransitionFields | Select-Object -ExpandProperty name ) -join ', ')" | Write-Debug
+            
+            $transitionFieldChanges = Get-ReducedFields -FieldChanges $Fields -Issue $Issue -AvailableFields ($availableTransitionFields | Where-Object { $editFieldChanges.Keys -inotcontains $_.id })
+            $transitionUpdateChanges = Get-ReducedUpdates -UpdateChanges $Updates -Issue $Issue -AvailableFields ($availableTransitionFields | Where-Object { $editUpdateChanges.Keys -inotcontains $_.id })
+        }
+
         $processed = Push-JiraIssueTransition `
           -AuthorizationHeaders $AuthorizationHeaders `
           -Issue $Issue `
           -TransitionId $transitionId `
+          -Fields $transitionFieldChanges `
+          -Updates $transitionUpdateChanges `
           -Comment $Comment
   
         $resultType = $processed ? [TransitionResultType]::Success : [TransitionResultType]::Failed
     }
-    catch [JiraInaccessibleException] {
-        $resultType = [TransitionResultType]::Failed
-        if ($safeFailIfJiraInaccessible) { throw }
-        
-        $resultType = [TransitionResultType]::Skipped
-        Write-Warning "[$($issue.key)] Unable to continue transitioning. Skipping!"
-        Write-Warning $_.Exception.MessageWithResponse()
-        Write-Debug $_.ScriptStackTrace
+    catch {
+        If ($_.Exception.GetType().ToString() -eq "JiraHttpRequesetException") {
+            $resultType = [TransitionResultType]::Failed
+            if ($safeFailIfJiraInaccessible) { throw }
+            
+            $resultType = [TransitionResultType]::Skipped
+            Write-Warning "[$($issue.key)] Unable to continue transitioning. Skipping!"
+            Write-Warning $_.Exception.MessageWithResponse()
+            Write-Debug $_.ScriptStackTrace
+        }
+        else {
+          throw
+        }
     }
     
     return $resultType

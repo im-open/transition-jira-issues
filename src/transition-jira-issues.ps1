@@ -27,8 +27,8 @@ $global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
 
 $throttleLimit = $isDebug ? 1 : $MAX_ISSUES_TO_TRANSITION 
 
-$env:GITHUB_RUNNER_URL = "{0}/{1}/actions/runs/{2}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_RUN_ID 
-$env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, "im-open/transition-jira-issues@v2.0.0"
+$env:GITHUB_RUNNER_URL = "{0}/{1}/actions/runs/{2}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_RUN_ID
+$env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, "im-open/transition-jira-issues"
 
 Function Write-IssueListOutput {
   Param (
@@ -135,9 +135,10 @@ try {
         }
     } -ThrottleLimit $throttleLimit
     
-    if ($exceptions.Length -gt 0) {
+    if ($exceptions.Count -gt 0) {
         $exceptions | Where-Object { $_ -ne $null } | ForEach-Object {
             Write-Error -Exception $_
+            Write-Debug $_.ScriptStackTrace
         } 
         Exit 1
     }
@@ -187,13 +188,13 @@ try {
 
     If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
         Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See job logs for details and action [$env:GITHUB_ACTION_URL] for additional help."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
         Exit 1
     }
 
     If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure) {
         Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job logs for details and action [$env:GITHUB_ACTION_URL] for additional help."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
     }
 
     If ($unavailableTransitionIssueKeys.Length -gt 0 -And !$MissingTransitionAsSuccessful) {
@@ -220,7 +221,7 @@ catch {
       Write-Error "Response: $($_.Exception.Response)"
     }
     
-    Write-Error $_.ScriptStackTrace
+    Write-Debug $_.ScriptStackTrace
     Exit 1
 }
 finally {
