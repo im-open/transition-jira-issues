@@ -197,7 +197,7 @@ Function Invoke-JiraTransitionIssue {
 
         $transitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $TransitionName }).id
         If ($null -eq $transitionId) {
-            $availableTransitionNames = $Issue.transitions | Select-Object -ExpandProperty to | Select-Object -ExpandProperty name
+            $availableTransitionNames = $Issue.transitions | Select-Object -ExpandProperty toName
             
             "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($availableTransitionNames -join ', ')" `
               | Write-Information 
