@@ -128,7 +128,7 @@ try {
               -Comment $using:Comment
   
             $added = $safeProcessedIssues.TryAdd($issue.key, $resultType)
-            Write-Debug "Added [$( $issue.key )] with result [$resultType] to processed issues? $added"
+            Write-Debug "[$( $issue.key )] processed with result [$resultType] to processed issues? $added"
         }
         catch {
             return $_.Exception

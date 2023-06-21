@@ -167,6 +167,8 @@ Function Invoke-JiraTransitionIssue {
 
     $resultType = [TransitionResultType]::Unknown
     try {
+        $availableTransitionNames = $Issue.transitions | Select-Object -ExpandProperty toName
+      
         $availableEditFields = $Issue.fields | Where-Object { $_.isEditable }
         $editFieldChanges = (Get-ReducedFields -FieldChanges $Fields -Issue $Issue -AvailableFields $availableEditFields)
         $editUpdateChanges = (Get-ReducedUpdates -UpdateChanges $Updates -Issue $Issue -AvailableFields $availableEditFields)
@@ -197,8 +199,6 @@ Function Invoke-JiraTransitionIssue {
 
         $transitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $TransitionName }).id
         If ($null -eq $transitionId) {
-            $availableTransitionNames = $Issue.transitions | Select-Object -ExpandProperty toName
-            
             "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($availableTransitionNames -join ', ')" `
               | Write-Information 
     
