@@ -152,7 +152,7 @@ try {
     $transitionedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Success } | ForEach-Object { $_.Key })
     $skippedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Skipped } | ForEach-Object { $_.Key })
     $unavailableTransitionIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Unavailable } | ForEach-Object { $_.Key })
-    $notFoundIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }) : @()
+    $notFoundIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -inotcontains $_ }) : @()
     
     $successfulyProcessedIssueKeys = $transitionedIssueKeys + $skippedIssueKeys
     
@@ -160,7 +160,7 @@ try {
         Write-Information "Issues missing transition will be treated as successful!"
         $successfulyProcessedIssueKeys += $unavailableTransitionIssueKeys
     }
-    $failedIssueKeys = @($identifiedIssueKeys | Where-Object { $successfulyProcessedIssueKeys -notcontains $_ })
+    $failedIssueKeys = @($identifiedIssueKeys | Where-Object { $successfulyProcessedIssueKeys -inotcontains $_ })
 
     # Outputs
     # ------------  

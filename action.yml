@@ -128,8 +128,8 @@ runs:
         
         $JqlToQueryBy = $env:QUERY.Trim()
         $IssueKeys = @($env:ISSUES -split "`n") -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
-        $Fields = $env:FIELDS | ConvertFrom-Json -AsHashtable
-        $Updates = $env:UPDATES | ConvertFrom-Json -AsHashtable
+        $Fields = $env:FIELDS ?? "{}" | ConvertFrom-Json -AsHashtable
+        $Updates = $env:UPDATES ?? "{}" | ConvertFrom-Json -AsHashtable
         
         ${{ github.action_path }}/src/transition-jira-issues.ps1 `
           -JiraDomain "${{ inputs.domain-name }}" `

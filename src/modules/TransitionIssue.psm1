@@ -40,7 +40,7 @@ Function Get-ReducedFields {
     
     If ($reducedFields.Count -eq 0) {
         "[$issueKey] No valid fields were identified for $issueType." `
-          | Write-Warning
+          | Write-Debug
         return $reducedFields
     }
 
@@ -122,7 +122,7 @@ Function Get-ReducedUpdates {
 
     If ($reducedUpdates.Count -eq 0) {
         "[$issueKey] No valid update operations were identified for $issueType." `
-          | Write-Warning
+        | Write-Debug
         return $reducedUpdates
     }
   
