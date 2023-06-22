@@ -42,7 +42,7 @@ Function Write-IssueListOutput {
 
     $issueKeysAsString = $issueKeys -join ', '
     "$name=$issueKeysAsString" >> $env:GITHUB_OUTPUT
-    "has_$name=$($issueKeys.Length -gt 0)" >> $env:GITHUB_OUTPUT
+    "has_$name=$(($issueKeys.Length -gt 0).ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
     If ([string]::IsNullOrEmpty($message)) { return }
     If ($conditional -And $issueKeys.Length -eq 0) { return }
@@ -75,6 +75,8 @@ try {
         Write-Error "Either the JQL and/or a list of issue keys must be provided"
         Exit 1
     }
+
+    Write-Information "Searching for issue using query [$JqlToQueryBy]..."
     
     $issues = @()
     try {
@@ -92,8 +94,6 @@ try {
         Write-Debug $_.ScriptStackTrace
     }
 
-    Write-Information "Processing issues from JQL [$JqlToQueryBy]"
-    
     If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible) {
         "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..." `
           | Write-Output
@@ -105,6 +105,8 @@ try {
           | Write-Error
         Exit 1
     }
+
+    Write-Information "Processing issues from query results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
 
     $processedIssues = [System.Collections.Concurrent.ConcurrentDictionary[string, TransitionResultType]]::new()
     $exceptions = $issues | ForEach-Object -Parallel {
@@ -147,7 +149,7 @@ try {
     # ------------  
     
     # Don't flattern the array @()
-    $identifiedIssueKeys = @($processedIssues.Keys)
+    $identifiedIssueKeys = @($issues | Select-Object -ExpandProperty key)
     
     $transitionedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Success } | ForEach-Object { $_.Key })
     $skippedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Skipped } | ForEach-Object { $_.Key })
@@ -164,7 +166,7 @@ try {
 
     # Outputs
     # ------------  
-    "isSuccessful=$($failedIssueKeys.Length -eq 0 -And !($FailIfIssueExcluded -And $excludedIssueKeys.Length -gt 0))" >> $env:GITHUB_OUTPUT
+    "isSuccessful=$(($failedIssueKeys.Length -eq 0 -And !($FailIfIssueExcluded -And $excludedIssueKeys.Length -gt 0)).ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
     Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues attempted to transition"
     Write-IssueListOutput -name "processedIssues" -issueKeys $successfulyProcessedIssueKeys -message "All successfully processed transitions" -debug

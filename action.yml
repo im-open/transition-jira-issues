@@ -150,4 +150,4 @@ runs:
       if: ${{ inputs.create-notice == 'true' && steps.transition.outputs.isSuccessful == 'true' }}
       shell: pwsh
       run: |
-        Write-Output "::notice title=Jira Issue Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned (if available) to [${{ inputs.transition-name }}]" 
+        Write-Output "::notice title=Jira Issue Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned where available to [${{ inputs.transition-name }}]" 
