@@ -40,8 +40,8 @@ inputs:
     required: false
     default: 'true'
     
-  fail-if-issue-not-found:
-    description: Fail if some issues are not found.
+  fail-if-issue-excluded:
+    description: Fail if some issues are excluded from the original query.
     required: false
     default: 'true'
 
@@ -76,9 +76,9 @@ outputs:
     description: Issues missing the specificed transition.
     value: ${{ steps.transition.outputs.unavailableTransitionIssues }}
   
-  not-found-issues:
-    description: Issues not found in Jira.
-    value: ${{ steps.transition.outputs.notfoundIssues }}
+  excluded-issues:
+    description: Issues excluded that are listed in the 'issues' input by not identified by query.
+    value: ${{ steps.transition.outputs.excludedIssues }}
     
   is-successful:
     description: One or more issues were transitioned successfully and/or skipped.
@@ -96,9 +96,9 @@ outputs:
     description: Some issues skipped when already transitioned or other causes.
     value: ${{ steps.transition.outputs.has_skippedIssues }}
     
-  some-not-found:
-    description: Some issues were not found in Jira.
-    value: ${{ steps.transition.outputs.has_notfoundIssues }}
+  some-excluded:
+    description: Some issues were excluded.
+    value: ${{ steps.transition.outputs.has_excludedIssues }}
 
 runs:
   using: 'composite'
@@ -143,7 +143,7 @@ runs:
           -JiraPassword $securePassword `
           -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
           -FailOnTransitionFailure:$${{ (inputs.fail-on-transition-failure == 'true' && 'true') || 'false' }} `
-          -FailIfIssueNotFound:$${{ (inputs.fail-if-issue-not-found == 'true' && 'true') || 'false' }} `
+          -FailIfIssueExcluded:$${{ (inputs.fail-if-issue-excluded == 'true' && 'true') || 'false' }} `
           -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 
         
     - name: Add notice

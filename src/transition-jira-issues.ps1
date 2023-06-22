@@ -13,7 +13,7 @@ param (
     [securestring]$JiraPassword,
     [switch]$MissingTransitionAsSuccessful = $false,
     [switch]$FailOnTransitionFailure = $false,
-    [switch]$FailIfIssueNotFound = $false,
+    [switch]$FailIfIssueExcluded = $false,
     [switch]$FailIfJiraInaccessible = $false,
     [switch]$Debug = $false
 )
@@ -152,7 +152,7 @@ try {
     $transitionedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Success } | ForEach-Object { $_.Key })
     $skippedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Skipped } | ForEach-Object { $_.Key })
     $unavailableTransitionIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Unavailable } | ForEach-Object { $_.Key })
-    $notFoundIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -inotcontains $_ }) : @()
+    $excludedIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -inotcontains $_ }) : @()
     
     $successfulyProcessedIssueKeys = $transitionedIssueKeys + $skippedIssueKeys
     
@@ -164,7 +164,7 @@ try {
 
     # Outputs
     # ------------  
-    "isSuccessful=$($failedIssueKeys.Length -eq 0 -And !($FailIfIssueNotFound -And $notFoundIssueKeys.Length -gt 0))" >> $env:GITHUB_OUTPUT
+    "isSuccessful=$($failedIssueKeys.Length -eq 0 -And !($FailIfIssueExcluded -And $excludedIssueKeys.Length -gt 0))" >> $env:GITHUB_OUTPUT
 
     Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues attempted to transition"
     Write-IssueListOutput -name "processedIssues" -issueKeys $successfulyProcessedIssueKeys -message "All successfully processed transitions" -debug
@@ -172,17 +172,17 @@ try {
     Write-IssueListOutput -name "failedIssues" -issueKeys $failedIssueKeys -message "Issues unable to be transitioned"
     Write-IssueListOutput -name "unavailableTransitionIssues" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step" -conditional
     Write-IssueListOutput -name "skippedIssues" -issueKeys $skippedIssueKeys -message "Skipped issues with transition already performed" -conditional
-    Write-IssueListOutput -name "notfoundIssues" -issueKeys $notFoundIssueKeys -message "Issues not found" -conditional
+    Write-IssueListOutput -name "excludedIssues" -issueKeys $excludedIssueKeys -message "Issues excluded from query" -conditional
     
     # Notices on Runner
     # ------------
     If ($identifiedIssueKeys.Length -eq 0 -And $FailOnTransitionFailure) {
-        Write-Output "::error title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
+        Write-Output "::error title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
         Exit 1
     }
 
     If ($identifiedIssueKeys.Length -eq 0 -And !$FailOnTransitionFailure) {
-        Write-Output "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
+        Write-Output "::warning title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
         Exit 0 
     }
 
@@ -202,13 +202,13 @@ try {
       Exit 1
     }
 
-    If ($notFoundIssueKeys.Length -gt 0 -And $FailIfIssueNotFound) {
-        Write-Output "::error title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
+    If ($excludedIssueKeys.Length -gt 0 -And $FailIfIssueExcluded) {
+        Write-Output "::error title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query {$JqlToQueryBy}"
         Exit 1
     }
 
-    If ($notFoundIssueKeys.Length -gt 0 -And !$FailIfIssueNotFound) {
-        Write-Output "::warning title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
+    If ($excludedIssueKeys.Length -gt 0 -And !$FailIfIssueExcluded) {
+        Write-Output "::warning title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query {$JqlToQueryBy}"
     }
 
     Exit 0

@@ -132,7 +132,7 @@ Function Get-JiraIssuesByQuery {
       -Uri $uri `
       -AuthorizationHeaders $AuthorizationHeaders `
       -SkipHttpErrorCheck
-
+    
     If ($response.StatusCode -eq 404) {
         return @()
     }
@@ -143,7 +143,7 @@ Function Get-JiraIssuesByQuery {
           $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)"
         return @()
     }
-
+    
     If ($response.StatusCode -ne 200) {
         throw [JiraHttpRequesetException]::new("Failed querying {$Jql}", $uri, $response)
     }

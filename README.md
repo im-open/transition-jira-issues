@@ -32,7 +32,7 @@ Work items, tickets, etc. are referenced as "issues" in this action.
 | `comment`                          | false          | Add a comment to the issue after the transition.                                                                                                                                                                                             |
 | `missing-transition-as-successful` | false          | Mark as a successful if issue is missing the transition. _`true` by default._                                                                                                                                                                |
 | `fail-on-transition-failure`       | false          | Fail if some issues failed transitioning. _`true` by default._                                                                                                                                                                               |
-| `fail-if-issue-not-found`          | false          | Fail if some issues are not found that are listed in the `issues` input. _`true` by default._                                                                                                                                                |
+| `fail-if-issue-excluded`           | false          | Fail if some issues are excluded that are listed in the `issues` input but not identified by query. _`true` by default._                                                                                                                     |
 | `fail-if-jira-inaccessible`        | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is down but shouldn't block the pipeline. _`false` by default._                                                                                                                   |
 | `jira-username`                    | false          | The username to login to Jira with in order to perform the transition.                                                                                                                                                                       |
 | `jira-password`                    | false          | The password to login to Jira with in order to perform the transition.                                                                                                                                                                       |
@@ -46,12 +46,12 @@ Work items, tickets, etc. are referenced as "issues" in this action.
 | `processed-issues`   | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition.                                                            | Comma-delimited list |
 | `failed-issues`      | Issues in Jira not successfully processed.                                                                                                            | Comma-delimited list |
 | `unavailable-issues` | Issues missing the specificed transition.                                                                                                             | Comma-delimited list |
-| `not-found-issues`   | Issues not found in Jira.                                                                                                                             | Comma-delimited list |
+| `excluded-issues`    | Issues excluded that are listed in the `issues` input by not identified by query.                                                                     | Comma-delimited list |
 | `is-successful`      | One or more issues were transitioned successfully and/or skipped. _If `missing-transition-as-successful` enabled, also includes missing transitions._ | Boolean              |
 | `some-identified`    | Some issues were found in Jira.                                                                                                                       | Boolean              |
 | `some-unavailable`   | Some issues do not have transition.                                                                                                                   | Boolean              |
 | `some-skipped`       | Some issues skipped when already transitioned or other causes.                                                                                        | Boolean              |
-| `some-not-found`     | Some issues were not found in Jira.                                                                                                                   | Boolean              |
+| `some-excluded`      | Some issues were excluded.                                                                                                                            | Boolean              |
 
 ## Example
 
