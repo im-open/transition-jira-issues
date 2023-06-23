@@ -1,3 +1,23 @@
+Function Get-FieldByNameOrId {
+    [OutputType([PSCustomObject])]
+    Param (
+        [string]$FieldIdOrName,
+        [PSCustomObject[]]$Fields
+    )
+    
+    If ([string]::IsNullOrEmpty($FieldIdOrName)) {
+        Throw "FieldIdOrName is null or missing" 
+    }
+    
+    If ($null -eq $Issue) {
+        Throw "Issue is null or missing" 
+    }
+
+    $field = $Fields | Where-Object { $_.id, $_.name -icontains $FieldIdOrName }
+    If ($fieldId.Count -gt 1) { return $null }
+    return $field
+}
+
 Function Invoke-HandleBadRequest {
     Param (
         [hashtable]$content,
@@ -10,9 +30,9 @@ Function Invoke-HandleBadRequest {
   
     $fieldIdToName = @{}
     ForEach ($fieldId in $content.errors.Keys) {
-      $field = $Issue.editmeta.fields.$fieldId
-      If ($null -ne $field -And $field.name -ne $fieldId -And $content.errors[$fieldId] -inotlike "*$( $field.name )*") {
-          $fieldIdToName.Add($fieldId, $field.name)
+      $fieldName = (Get-FieldByNameOrId -FieldIdOrName $fieldId -Fields $Issue.fields).name
+      If ($null -ne $fieldName -And $fieldName -ine $fieldId -And $content.errors[$fieldId] -inotlike "*$( $fieldName )*") {
+          $fieldIdToName.Add($fieldId, $fieldName)
       }
     }
   
@@ -83,7 +103,7 @@ Function Invoke-JiraApi {
     }
 }
 
-# https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-get
+# https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issue-search/#api-rest-api-2-search-get
 Function Get-JiraIssuesByQuery {
     [OutputType([PSCustomObject[]])]
     Param (
@@ -91,7 +111,7 @@ Function Get-JiraIssuesByQuery {
         [Uri]$BaseUri,
         [string]$Jql,
         [int]$MaxResults = 20,
-        [switch]$IncludeDetails = $false
+        [switch]$IncludeDetails = $true
     )
 
     If ([string]::IsNullOrEmpty($Jql)) {
@@ -100,8 +120,8 @@ Function Get-JiraIssuesByQuery {
 
     $queryParams = @{
         maxResults = $MaxResults
-        fields = [System.Web.HttpUtility]::UrlEncode("-comment,-description,-fixVersions,-issuelinks,-reporter,-resolution,-subtasks,-timetracking,-worklog,-project,-watches,-attachment")
-        expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("transitions,editmeta") : ""
+        fields = [System.Web.HttpUtility]::UrlEncode("-comment,-timetracking,-worklog,-project,-watches")
+        expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("transitions,editmeta,names") : ""
         jql = [System.Web.HttpUtility]::UrlEncode($Jql)
     }
     $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
@@ -112,29 +132,69 @@ Function Get-JiraIssuesByQuery {
       -Uri $uri `
       -AuthorizationHeaders $AuthorizationHeaders `
       -SkipHttpErrorCheck
-
+    
     If ($response.StatusCode -eq 404) {
         return @()
     }
 
     # Jira will return a 400 when a issue doesn't produce any results
     If ($response.StatusCode -eq 400) {
-      Write-Warning "Failed querying Jira Issues: $( `
-        $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)"
-      return @()
+        Write-Warning "Failed querying Jira Issues: $( `
+          $response.Content | ConvertFrom-Json -AsHashTable | ConvertTo-Json -Depth 10)"
+        return @()
     }
-
+    
     If ($response.StatusCode -ne 200) {
         throw [JiraHttpRequesetException]::new("Failed querying {$Jql}", $uri, $response)
     }
     
-    $issues = ($response.Content | ConvertFrom-Json).issues
+    $content = $response.Content | ConvertFrom-Json -Depth 10
+    $issues = $content.issues
+    $names = $content.names
+
     If($null -eq $issues) {
       return @()
     }
+    
+    $resolvedIssues = @()
+    ForEach ($issue in $issues) {
+      
+      $fields = $issue.fields.PSObject.Properties | ForEach-Object {
+          $fieldId = $_.Name
+          
+          [PSCustomObject]@{
+            id = $fieldId
+            name = $names.$fieldId
+            isEditable = $null -ne $issue.editmeta.fields.$fieldId 
+            operations = $issue.editmeta.fields.$fieldId.operations ?? @()
+            schemaType = $issue.editmeta.fields.$fieldId.schema.type
+          }
+      }
+      
+      $transitions = $issue.transitions | ForEach-Object {
+          [PSCustomObject]@{
+            id = $_.id
+            name = $_.name
+            toName = $_.to.name
+          }
+      }
 
+      $resolvedIssues += [PSCustomObject]@{
+        key = $issue.key
+        self = $issue.self
+        type = $issue.fields.issuetype.name
+        status = $issue.fields.status.name 
+        summary = $issue.fields.summary
+        labels = $issue.fields.labels
+        componentNames = ($issue.fields.components | Select-Object -ExpandProperty name)
+        fields = $fields
+        fieldValues = $issue.fields
+        transitions = $transitions
+      }
+    }
+    
     # Do not flattern array if single item
-    return ,@($issues)
+    return ,@($resolvedIssues)
 }
 
 # https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-get
@@ -152,6 +212,7 @@ Function Get-JiraIssue {
   }
 
   $queryParams = @{
+    fields = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("*all") : ""
     expand = $IncludeDetails ? [System.Web.HttpUtility]::UrlEncode("renderedFields,transitions,editmeta,names") : ""
   }
   
@@ -214,23 +275,83 @@ Function Edit-JiraIssue {
       -SkipHttpErrorCheck
   
   If ($response.StatusCode -eq 204) {
-    return $true
+      return $true
   }
 
   If ($response.StatusCode -eq 404) {
-    return $false
+      return $false
   }
 
   If ($response.StatusCode -eq 400) {
-    $content = ($response.Content | ConvertFrom-Json -AsHashTable)
-    Invoke-HandleBadRequest -Issue $Issue -Content $content
-    return $false
+      $content = ($response.Content | ConvertFrom-Json -AsHashTable)
+      Invoke-HandleBadRequest -Issue $Issue -Content $content
+      return $false
   }
 
   throw [JiraHttpRequesetException]::new("Failed editing Jira Issue [$issueKey]", $IssueUri, $response)
 }
 
-# https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-issueidorkey-transitions-post
+# https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-transitions-get
+Function Get-JiraIssueTransitionAvailableFields {
+  [OutputType([PSCustomObject])]
+  Param (
+      [hashtable]$AuthorizationHeaders = @{},
+      [PSCustomObject]$Issue,
+      [string]$TransitionId
+  )
+
+  $issueKey = $Issue.key
+  $issueUri = $Issue.self
+
+  If ([string]::IsNullOrEmpty($issueUri)) {
+      throw "[$issueKey] Issue Uri is null or missing"
+  }
+
+  If ([string]::IsNullOrEmpty($TransitionId)) {
+      throw "Transation ID is null or missing"
+  }
+
+  $queryParams = @{
+    transitionId = $TransitionId
+    expand = [System.Web.HttpUtility]::UrlEncode("transitions.fields")
+  }
+  $queryParamsExpanded = $queryParams.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }
+
+  $response = Invoke-JiraApi `
+    -Uri ("$issueUri/transitions?{0}" -f ($queryParamsExpanded -join '&')) `
+    -AuthorizationHeaders $AuthorizationHeaders `
+    -SkipHttpErrorCheck
+
+  If ($response.StatusCode -eq 404) {
+      return $null
+  }
+
+  If ($response.StatusCode -ne 200) {
+    throw [JiraHttpRequesetException]::new("Failed getting Jira Issue Transition [$issueKey/$TransitionId]", $uri, $response)
+  }
+
+  $transitions = ($response.Content | ConvertFrom-Json).transitions
+  If($null -eq $transitions) {
+      return @()
+  } 
+  
+  If ($transitions.Length -ne 1) {
+      throw "Expected 1 transition, but found $($transitions.Count) transitions from ID [$TransitionId]"
+  }
+  
+  $fields = $transitions.fields.PSObject.Properties | ForEach-Object {
+      [PSCustomObject]@{
+        id = $_.Name
+        name = $_.Value.name
+        operations = $_.Value.operations ?? @()
+        schemaType = $_.Value.schema.type
+      }
+  }
+  
+  return ,@($fields)
+}
+
+# https://developer.atlassian.com/cloud/jira/platform/rest/v2/api-group-issues/#api-rest-api-2-issue-issueidorkey-transitions-get
 # Can only transition if all required fields are set (this is setup within Jira)
 # Can only update a field if it is on the transition screen. 
 # Thus its better to update fields in a seperate call to the edit issue endpoint
@@ -249,7 +370,7 @@ Function Push-JiraIssueTransition {
     $issueUri = $Issue.self
 
     If ([string]::IsNullOrEmpty($issueUri)) {
-      throw "[$issueKey] Issue Uri is null or missing"
+        throw "[$issueKey] Issue Uri is null or missing"
     }
     
     $body = @{
@@ -322,7 +443,7 @@ Function New-Comment {
   )
 
   If ([string]::IsNullOrEmpty($Comment)) {
-    return @{}
+      return @{}
   }
 
   return @{
@@ -355,4 +476,4 @@ class JiraHttpRequesetException : System.Net.Http.HttpRequestException {
   }
 }
 
-Export-ModuleMember -Function Push-JiraIssueTransition, Get-JiraTransitionsByIssue, Get-JiraIssuesByQuery, Get-JiraIssue, Edit-JiraIssue, Get-AuthorizationHeaders
+Export-ModuleMember -Function Push-JiraIssueTransition, Get-JiraIssueTransitionAvailableFields, Get-JiraIssuesByQuery, Get-JiraIssue, Edit-JiraIssue, Get-AuthorizationHeaders, Get-FieldByNameOrId

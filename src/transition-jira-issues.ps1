@@ -13,7 +13,7 @@ param (
     [securestring]$JiraPassword,
     [switch]$MissingTransitionAsSuccessful = $false,
     [switch]$FailOnTransitionFailure = $false,
-    [switch]$FailIfIssueNotFound = $false,
+    [switch]$FailIfIssueExcluded = $false,
     [switch]$FailIfJiraInaccessible = $false,
     [switch]$Debug = $false
 )
@@ -27,8 +27,8 @@ $global:DebugPreference = $isDebug ? "Continue" : "SilentlyContinue"
 
 $throttleLimit = $isDebug ? 1 : $MAX_ISSUES_TO_TRANSITION 
 
-$env:GITHUB_RUNNER_URL = "{0}/{1}/actions/runs/{2}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_RUN_ID 
-$env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, "im-open/transition-jira-issues@v2.0.0"
+$env:GITHUB_RUNNER_URL = "{0}/{1}/actions/runs/{2}" -f $env:GITHUB_SERVER_URL, $env:GITHUB_REPOSITORY, $env:GITHUB_RUN_ID
+$env:GITHUB_ACTION_URL = "{0}/{1}" -f $env:GITHUB_SERVER_URL, "im-open/transition-jira-issues"
 
 Function Write-IssueListOutput {
   Param (
@@ -42,7 +42,7 @@ Function Write-IssueListOutput {
 
     $issueKeysAsString = $issueKeys -join ', '
     "$name=$issueKeysAsString" >> $env:GITHUB_OUTPUT
-    "has_$name=$($issueKeys.Length -gt 0)" >> $env:GITHUB_OUTPUT
+    "has_$name=$(($issueKeys.Length -gt 0).ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
     If ([string]::IsNullOrEmpty($message)) { return }
     If ($conditional -And $issueKeys.Length -eq 0) { return }
@@ -75,6 +75,8 @@ try {
         Write-Error "Either the JQL and/or a list of issue keys must be provided"
         Exit 1
     }
+
+    Write-Information "Searching for issue using query [$JqlToQueryBy]..."
     
     $issues = @()
     try {
@@ -92,8 +94,6 @@ try {
         Write-Debug $_.ScriptStackTrace
     }
 
-    Write-Information "Processing issues from JQL [$JqlToQueryBy]"
-    
     If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible) {
         "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..." `
           | Write-Output
@@ -105,6 +105,8 @@ try {
           | Write-Error
         Exit 1
     }
+
+    Write-Information "Processing issues from query results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
 
     $processedIssues = [System.Collections.Concurrent.ConcurrentDictionary[string, TransitionResultType]]::new()
     $exceptions = $issues | ForEach-Object -Parallel {
@@ -128,16 +130,17 @@ try {
               -Comment $using:Comment
   
             $added = $safeProcessedIssues.TryAdd($issue.key, $resultType)
-            Write-Debug "Added [$( $issue.key )] with result [$resultType] to processed issues? $added"
+            Write-Debug "[$( $issue.key )] processed with result [$resultType] to processed issues? $added"
         }
         catch {
             return $_.Exception
         }
     } -ThrottleLimit $throttleLimit
     
-    if ($exceptions.Length -gt 0) {
+    if ($exceptions.Count -gt 0) {
         $exceptions | Where-Object { $_ -ne $null } | ForEach-Object {
             Write-Error -Exception $_
+            Write-Debug $_.ScriptStackTrace
         } 
         Exit 1
     }
@@ -146,12 +149,12 @@ try {
     # ------------  
     
     # Don't flattern the array @()
-    $identifiedIssueKeys = @($processedIssues.Keys)
+    $identifiedIssueKeys = @($issues | Select-Object -ExpandProperty key)
     
     $transitionedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Success } | ForEach-Object { $_.Key })
     $skippedIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Skipped } | ForEach-Object { $_.Key })
     $unavailableTransitionIssueKeys = @($processedIssues.ToArray() | Where-Object { $_.Value -eq [TransitionResultType]::Unavailable } | ForEach-Object { $_.Key })
-    $notFoundIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -notcontains $_ }) : @()
+    $excludedIssueKeys = $IssueKeys.Length -gt 0 ? @($IssueKeys | Where-Object { $identifiedIssueKeys -inotcontains $_ }) : @()
     
     $successfulyProcessedIssueKeys = $transitionedIssueKeys + $skippedIssueKeys
     
@@ -159,11 +162,11 @@ try {
         Write-Information "Issues missing transition will be treated as successful!"
         $successfulyProcessedIssueKeys += $unavailableTransitionIssueKeys
     }
-    $failedIssueKeys = @($identifiedIssueKeys | Where-Object { $successfulyProcessedIssueKeys -notcontains $_ })
+    $failedIssueKeys = @($identifiedIssueKeys | Where-Object { $successfulyProcessedIssueKeys -inotcontains $_ })
 
     # Outputs
     # ------------  
-    "isSuccessful=$($failedIssueKeys.Length -eq 0 -And !($FailIfIssueNotFound -And $notFoundIssueKeys.Length -gt 0))" >> $env:GITHUB_OUTPUT
+    "isSuccessful=$(($failedIssueKeys.Length -eq 0 -And !($FailIfIssueExcluded -And $excludedIssueKeys.Length -gt 0)).ToString().ToLower())" >> $env:GITHUB_OUTPUT
 
     Write-IssueListOutput -name "identifiedIssues" -issueKeys $identifiedIssueKeys -message "All issues attempted to transition"
     Write-IssueListOutput -name "processedIssues" -issueKeys $successfulyProcessedIssueKeys -message "All successfully processed transitions" -debug
@@ -171,29 +174,29 @@ try {
     Write-IssueListOutput -name "failedIssues" -issueKeys $failedIssueKeys -message "Issues unable to be transitioned"
     Write-IssueListOutput -name "unavailableTransitionIssues" -issueKeys $unavailableTransitionIssueKeys -message "Issues missing transition step" -conditional
     Write-IssueListOutput -name "skippedIssues" -issueKeys $skippedIssueKeys -message "Skipped issues with transition already performed" -conditional
-    Write-IssueListOutput -name "notfoundIssues" -issueKeys $notFoundIssueKeys -message "Issues not found" -conditional
+    Write-IssueListOutput -name "excludedIssues" -issueKeys $excludedIssueKeys -message "Issues excluded from query" -conditional
     
     # Notices on Runner
     # ------------
     If ($identifiedIssueKeys.Length -eq 0 -And $FailOnTransitionFailure) {
-        Write-Output "::error title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
+        Write-Output "::error title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
         Exit 1
     }
 
     If ($identifiedIssueKeys.Length -eq 0 -And !$FailOnTransitionFailure) {
-        Write-Output "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}"
+        Write-Output "::warning title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
         Exit 0 
     }
 
     If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
         Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See job logs for details and action [$env:GITHUB_ACTION_URL] for additional help."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
         Exit 1
     }
 
     If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure) {
         Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job logs for details and action [$env:GITHUB_ACTION_URL] for additional help."
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
     }
 
     If ($unavailableTransitionIssueKeys.Length -gt 0 -And !$MissingTransitionAsSuccessful) {
@@ -201,13 +204,13 @@ try {
       Exit 1
     }
 
-    If ($notFoundIssueKeys.Length -gt 0 -And $FailIfIssueNotFound) {
-        Write-Output "::error title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
+    If ($excludedIssueKeys.Length -gt 0 -And $FailIfIssueExcluded) {
+        Write-Output "::error title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query {$JqlToQueryBy}"
         Exit 1
     }
 
-    If ($notFoundIssueKeys.Length -gt 0 -And !$FailIfIssueNotFound) {
-        Write-Output "::warning title=$MESSAGE_TITLE::$($notFoundIssueKeys -join ', ') not found in Jira using query {$JqlToQueryBy}"
+    If ($excludedIssueKeys.Length -gt 0 -And !$FailIfIssueExcluded) {
+        Write-Output "::warning title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query {$JqlToQueryBy}"
     }
 
     Exit 0
@@ -220,7 +223,7 @@ catch {
       Write-Error "Response: $($_.Exception.Response)"
     }
     
-    Write-Error $_.ScriptStackTrace
+    Write-Debug $_.ScriptStackTrace
     Exit 1
 }
 finally {

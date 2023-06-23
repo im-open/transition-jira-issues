@@ -40,8 +40,8 @@ inputs:
     required: false
     default: 'true'
     
-  fail-if-issue-not-found:
-    description: Fail if some issues are not found.
+  fail-if-issue-excluded:
+    description: Fail if some issues are excluded from the original query.
     required: false
     default: 'true'
 
@@ -76,9 +76,9 @@ outputs:
     description: Issues missing the specificed transition.
     value: ${{ steps.transition.outputs.unavailableTransitionIssues }}
   
-  not-found-issues:
-    description: Issues not found in Jira.
-    value: ${{ steps.transition.outputs.notfoundIssues }}
+  excluded-issues:
+    description: Issues excluded that are listed in the 'issues' input but not identified by query.
+    value: ${{ steps.transition.outputs.excludedIssues }}
     
   is-successful:
     description: One or more issues were transitioned successfully and/or skipped.
@@ -96,9 +96,9 @@ outputs:
     description: Some issues skipped when already transitioned or other causes.
     value: ${{ steps.transition.outputs.has_skippedIssues }}
     
-  some-not-found:
-    description: Some issues were not found in Jira.
-    value: ${{ steps.transition.outputs.has_notfoundIssues }}
+  some-excluded:
+    description: Some issues were excluded.
+    value: ${{ steps.transition.outputs.has_excludedIssues }}
 
 runs:
   using: 'composite'
@@ -128,8 +128,8 @@ runs:
         
         $JqlToQueryBy = $env:QUERY.Trim()
         $IssueKeys = @($env:ISSUES -split "`n") -split "," | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" }
-        $Fields = $env:FIELDS | ConvertFrom-Json -AsHashtable
-        $Updates = $env:UPDATES | ConvertFrom-Json -AsHashtable
+        $Fields = [string]::IsNullOrWhiteSpace($env:FIELDS) ? @{} : ($env:FIELDS | ConvertFrom-Json -AsHashtable)
+        $Updates = [string]::IsNullOrWhiteSpace($env:UPDATES) ? @{} : ($env:UPDATES | ConvertFrom-Json -AsHashtable)
         
         ${{ github.action_path }}/src/transition-jira-issues.ps1 `
           -JiraDomain "${{ inputs.domain-name }}" `
@@ -143,11 +143,11 @@ runs:
           -JiraPassword $securePassword `
           -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
           -FailOnTransitionFailure:$${{ (inputs.fail-on-transition-failure == 'true' && 'true') || 'false' }} `
-          -FailIfIssueNotFound:$${{ (inputs.fail-if-issue-not-found == 'true' && 'true') || 'false' }} `
+          -FailIfIssueExcluded:$${{ (inputs.fail-if-issue-excluded == 'true' && 'true') || 'false' }} `
           -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 
         
     - name: Add notice
       if: ${{ inputs.create-notice == 'true' && steps.transition.outputs.isSuccessful == 'true' }}
       shell: pwsh
       run: |
-        Write-Output "::notice title=Jira Issue Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned (if available) to [${{ inputs.transition-name }}]" 
+        Write-Output "::notice title=Jira Issue Transitions::${{ steps.transition.outputs.processedIssues }} successfully processed and transitioned where available to [${{ inputs.transition-name }}]" 
