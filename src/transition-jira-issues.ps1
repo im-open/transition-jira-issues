@@ -12,6 +12,7 @@ param (
     [string]$JiraUsername,
     [securestring]$JiraPassword,
     [switch]$MissingTransitionAsSuccessful = $false,
+    [switch]$CreateWarningNotices = $false,
     [switch]$FailOnTransitionFailure = $false,
     [switch]$FailIfIssueExcluded = $false,
     [switch]$FailIfJiraInaccessible = $false,
@@ -68,7 +69,7 @@ try {
         $JqlToQueryBy = "key IN ($($IssueKeys -join ", "))"
     }
     ElseIf ($IssueKeys.Length -gt 0) {
-        $JqlToQueryBy = "($($JqlToQueryBy)) OR key IN ($($IssueKeys -join ", "))"
+        $JqlToQueryBy = "($($JqlToQueryBy)) AND key IN ($($IssueKeys -join ", "))"
     }
     
     If ([string]::IsNullOrEmpty($JqlToQueryBy)) {
@@ -94,14 +95,18 @@ try {
         Write-Debug $_.ScriptStackTrace
     }
 
-    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible) {
+    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And $CreateWarningNotices) {
         "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..." `
           | Write-Output
-        Exit 0
     }
 
+    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And !$FailIfIssueExcluded -And !$FailOnTransitionFailure) {
+      Exit 0
+    }
+
+    # TODO: This is not working
     If ($issues.Length -gt $MAX_ISSUES_TO_TRANSITION) {
-        "Too many issues returned by the query [$($.issues.Length)]. Adjust the the query to return less than or equal to $MAX_ISSUES_TO_TRANSITION issues." `
+        "Too many issues returned by the query [$($issues.Length)]. Adjust the the query to return less than or equal to $MAX_ISSUES_TO_TRANSITION issues." `
           | Write-Error
         Exit 1
     }
@@ -184,8 +189,13 @@ try {
     }
 
     If ($identifiedIssueKeys.Length -eq 0 -And !$FailOnTransitionFailure) {
-        Write-Output "::warning title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
+        If ($CreateWarningNotices) { Write-Output "::warning title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help." }
         Exit 0 
+    }
+
+    If ($unavailableTransitionIssueKeys.Length -gt 0 -And $FailOnTransitionFailure -And !$MissingTransitionAsSuccessful) {
+      Write-Output "::error title=$MESSAGE_TITLE::$($unavailableTransitionIssueKeys -join ', ') missing transition [$TransitionName]. You may enable 'missing-transition-as-successful' to treat these as a successful transition."
+      Exit 1
     }
 
     If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
@@ -194,14 +204,9 @@ try {
         Exit 1
     }
 
-    If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure) {
+    If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure -And $CreateWarningNotices) {
         Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $( `
           $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
-    }
-
-    If ($unavailableTransitionIssueKeys.Length -gt 0 -And !$MissingTransitionAsSuccessful) {
-      Write-Output "::error title=$MESSAGE_TITLE::$($unavailableTransitionIssueKeys -join ', ') missing transition [$TransitionName]. You may enable 'missing-transition-as-successful' to treat these as a successful transition."
-      Exit 1
     }
 
     If ($excludedIssueKeys.Length -gt 0 -And $FailIfIssueExcluded) {
@@ -209,7 +214,7 @@ try {
         Exit 1
     }
 
-    If ($excludedIssueKeys.Length -gt 0 -And !$FailIfIssueExcluded) {
+    If ($excludedIssueKeys.Length -gt 0 -And !$FailIfIssueExcluded -And $CreateWarningNotices) {
         Write-Output "::warning title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query {$JqlToQueryBy}"
     }
 
