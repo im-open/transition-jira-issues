@@ -77,7 +77,7 @@ try {
         Exit 1
     }
 
-    Write-Information "Searching for issue using query [$JqlToQueryBy]..."
+    Write-Information "Searching for issue using query:`n$JqlToQueryBy"
     
     $issues = @()
     try {
@@ -100,18 +100,15 @@ try {
           | Write-Output
     }
 
-    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And !$FailIfIssueExcluded -And !$FailOnTransitionFailure) {
-      Exit 0
-    }
-
-    # TODO: This is not working
     If ($issues.Length -gt $MAX_ISSUES_TO_TRANSITION) {
         "Too many issues returned by the query [$($issues.Length)]. Adjust the the query to return less than or equal to $MAX_ISSUES_TO_TRANSITION issues." `
           | Write-Error
         Exit 1
     }
 
-    Write-Information "Processing $($issues.Length) issues from query results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
+    If ($issues.Length -eq 0) {
+        Write-Information "Processing $($issues.Length) issues from query with results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
+    }
 
     $processedIssues = [System.Collections.Concurrent.ConcurrentDictionary[string, TransitionResultType]]::new()
     $exceptions = $issues | ForEach-Object -Parallel {
@@ -194,8 +191,8 @@ try {
     }
 
     If ($unavailableTransitionIssueKeys.Length -gt 0 -And $FailOnTransitionFailure -And !$MissingTransitionAsSuccessful) {
-      Write-Output "::error title=$MESSAGE_TITLE::$($unavailableTransitionIssueKeys -join ', ') missing transition [$TransitionName]. You may enable 'missing-transition-as-successful' to treat these as a successful transition."
-      Exit 1
+        Write-Output "::error title=$MESSAGE_TITLE::$($unavailableTransitionIssueKeys -join ', ') missing transition [$TransitionName]. You may enable 'missing-transition-as-successful' to treat these as a successful transition."
+        Exit 1
     }
 
     If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
