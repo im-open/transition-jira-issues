@@ -58,8 +58,13 @@ inputs:
     description: The password to login to Jira with in order to perform the transition. Must be set if jira-username is set. If set when jira-username is not set, it will be ignored.
     required: true
     
-  create-notices:
-    description: Add notifications to runner with details about successful transitioned issues, warnings or other errors. 
+  create-notice:
+    description: Add notification to runner with details about successful transitioned issues.
+    required: false
+    default: 'true'
+    
+  create-warnings:
+    description: Add warning notifications to runner.
     required: false
     default: 'true'
     
@@ -142,7 +147,7 @@ runs:
           -JiraUsername "${{ inputs.jira-username }}" `
           -JiraPassword $securePassword `
           -MissingTransitionAsSuccessful:$${{ (inputs.missing-transition-as-successful == 'true' && 'true') || 'false' }} `
-          -CreateWarningNotices:$${{ (inputs.create-notices == 'true' && 'true') || 'false' }} `
+          -CreateWarningNotices:$${{ (inputs.create-warnings == 'true' && 'true') || 'false' }} `
           -FailOnTransitionFailure:$${{ (inputs.fail-on-transition-failure == 'true' && 'true') || 'false' }} `
           -FailIfIssueExcluded:$${{ (inputs.fail-if-issue-excluded == 'true' && 'true') || 'false' }} `
           -FailIfJiraInaccessible:$${{ (inputs.fail-if-jira-inaccessible == 'true' && 'true') || 'false' }} 
