@@ -77,7 +77,7 @@ outputs:
     value: ${{ steps.transition.outputs.unavailableTransitionIssues }}
   
   excluded-issues:
-    description: Issues excluded that are listed in the 'issues' input by not identified by query.
+    description: Issues excluded that are listed in the 'issues' input but not identified by query.
     value: ${{ steps.transition.outputs.excludedIssues }}
     
   is-successful:
