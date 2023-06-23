@@ -86,7 +86,7 @@ try {
           -BaseUri $baseUri `
           -Jql $JqlToQueryBy `
           -IncludeDetails `
-          -MaxResults $MAX_ISSUES_TO_TRANSITION
+          -MaxResults ($MAX_ISSUES_TO_TRANSITION + 1)
     }
     catch [JiraHttpRequesetException] {
         if ($FailIfJiraInaccessible) { throw }
@@ -94,7 +94,7 @@ try {
         Write-Warning $_.Exception.MessageWithResponse()
         Write-Debug $_.ScriptStackTrace
     }
-
+    
     If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And $CreateWarningNotices) {
         "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..." `
           | Write-Output
@@ -111,7 +111,7 @@ try {
         Exit 1
     }
 
-    Write-Information "Processing issues from query results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
+    Write-Information "Processing $($issues.Length) issues from query results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
 
     $processedIssues = [System.Collections.Concurrent.ConcurrentDictionary[string, TransitionResultType]]::new()
     $exceptions = $issues | ForEach-Object -Parallel {
