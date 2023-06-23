@@ -46,7 +46,7 @@ Work items, tickets, etc. are referenced as "issues" in this action.
 | `processed-issues`   | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition.                                                            | Comma-delimited list |
 | `failed-issues`      | Issues in Jira not successfully processed.                                                                                                            | Comma-delimited list |
 | `unavailable-issues` | Issues missing the specificed transition.                                                                                                             | Comma-delimited list |
-| `excluded-issues`    | Issues excluded that are listed in the `issues` input by not identified by query.                                                                     | Comma-delimited list |
+| `excluded-issues`    | Issues excluded that are listed in the `issues` input but not identified by query.                                                                     | Comma-delimited list |
 | `is-successful`      | One or more issues were transitioned successfully and/or skipped. _If `missing-transition-as-successful` enabled, also includes missing transitions._ | Boolean              |
 | `some-identified`    | Some issues were found in Jira.                                                                                                                       | Boolean              |
 | `some-unavailable`   | Some issues do not have transition.                                                                                                                   | Boolean              |
