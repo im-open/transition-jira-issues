@@ -106,7 +106,7 @@ try {
         Exit 1
     }
 
-    If ($issues.Length -eq 0) {
+    If ($issues.Length -gt 0) {
         Write-Information "Processing $($issues.Length) issues from query with results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
     }
 
