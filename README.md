@@ -73,7 +73,7 @@ jobs:
       
       - name: Transition Jira Issue to Deployed Status
         # You may also reference just the major or major.minor version
-        uses: im-open/transition-jira-issues@v2.1.0
+        uses: im-open/transition-jira-issues@v2.1.1
         id: transition
         with:
           jira-username: ${{ vars.JIRA_USERNAME }}
@@ -101,7 +101,7 @@ jobs:
       # In those cases, where you want to still transition, a second step will need to be invoked.  
       # You can pass in the `unavailable-issues` output to transition those remaining issues.
       - name: Transition Remaining Jira issues to Closed Status
-        uses: im-open/transition-jira-issues@v2.1.0
+        uses: im-open/transition-jira-issues@v2.1.1
         with:
           jira-username: ${{ vars.JIRA_USERNAME }}
           jira-password: ${{ secrets.JIRA_PASSWORD }}
