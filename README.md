@@ -24,13 +24,15 @@ Work items, tickets, etc. are referenced as "issues" in this action.
 | Parameter                          | Is Required    | Description                                                                                                                                                                                                                                  |
 |------------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `domain-name`                      | true           | The domain name for Jira.                                                                                                                                                                                                                    |
-| `jql-query`                        | conditionally* | The JQL query to use to find issues that will be transitioned. A max of 20 issues can be transitioned.                                                                                                                                       |
+| `jql-query`                        | conditionally* | The [JQL query](https://support.atlassian.com/jira-software-cloud/docs/jql-operators/) to use to find issues that will be transitioned. A max of 20 issues can be transitioned.                                                              |
 | `issues`                           | conditionally* | Comma delimited list of issues to transition. Use `im-open/get-workitems-action` to identify list of issues for a PR or deployment.                                                                                                          |
 | `transition-name`                  | true           | The name of the transition to perform. _Examples might include Open, In Progress, Deployed, etc._                                                                                                                                            |
 | `update-fields`                    | false          | A [map](#updating-fields) of issue screen fields to overwrite, specifying the sub-field to update and its static value(s) for each field. When multiple sub-fields or other operations are required, use 'process-operations' input instead. |
 | `process-operations`               | false          | A [map](#updating-fields) containing the field name and a list of operations to perform. _The fields included in here cannot be included in 'update-fields' input._                                                                          |
 | `comment`                          | false          | Add a comment to the issue after the transition.                                                                                                                                                                                             |
 | `missing-transition-as-successful` | false          | Mark as a successful if issue is missing the transition. _`true` by default._                                                                                                                                                                |
+| `create-notice`                    | false          | Add notification to runner with details about successful transitioned issues. _`true` by default._                                                                                                                                           |
+| `create-warnings`                  | false          | Add warning notifications to runner. _`true` by default._                                                                                                                                                                                    |
 | `fail-on-transition-failure`       | false          | Fail if some issues failed transitioning. _`true` by default._                                                                                                                                                                               |
 | `fail-if-issue-excluded`           | false          | Fail if some issues are excluded that are listed in the `issues` input but not identified by query. _`true` by default._                                                                                                                     |
 | `fail-if-jira-inaccessible`        | false          | Fail if Jira is inaccessible at the moment. Sometimes Jira is down but shouldn't block the pipeline. _`false` by default._                                                                                                                   |
@@ -71,7 +73,7 @@ jobs:
       
       - name: Transition Jira Issue to Deployed Status
         # You may also reference just the major or major.minor version
-        uses: im-open/transition-jira-issues@v2.0.2
+        uses: im-open/transition-jira-issues@v2.1.0
         id: transition
         with:
           jira-username: ${{ vars.JIRA_USERNAME }}
@@ -99,7 +101,7 @@ jobs:
       # In those cases, where you want to still transition, a second step will need to be invoked.  
       # You can pass in the `unavailable-issues` output to transition those remaining issues.
       - name: Transition Remaining Jira issues to Closed Status
-        uses: im-open/transition-jira-issues@v2.0.2
+        uses: im-open/transition-jira-issues@v2.1.0
         with:
           jira-username: ${{ vars.JIRA_USERNAME }}
           jira-password: ${{ secrets.JIRA_PASSWORD }}
