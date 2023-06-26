@@ -7,7 +7,7 @@ inputs:
     required: true
     
   jql-query:
-    description: The JQL query to use to find issues that will be transitioned. If provided, will included issues passed in the 'issues' input.
+    description: The JQL query to use to find issues that will be transitioned. If `issues` input is also provided, only issues returned by the JQL query and are included in the `issues` list will be transitioned.
     required: false
     
   issues:
