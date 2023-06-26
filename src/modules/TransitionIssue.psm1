@@ -189,15 +189,17 @@ Function Invoke-JiraTransitionIssue {
               return [TransitionResultType]::Failed
           }
         }
+
+        $transitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $TransitionName }).id
+        $currentTransitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $issueStatus }).id
       
-        If ($issueStatus -ieq $TransitionName) {
+        If ($currentTransitionId -ieq $transitionId -Or $issueStatus -ieq $TransitionName) {
             "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($Issue.availableTransitionNames -join ', ')" `
               | Write-Information
     
             return [TransitionResultType]::Skipped 
         }
 
-        $transitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $TransitionName }).id
         If ($null -eq $transitionId) {
             "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($availableTransitionNames -join ', ')" `
               | Write-Information 
