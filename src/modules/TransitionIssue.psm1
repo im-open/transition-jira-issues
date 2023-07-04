@@ -190,26 +190,26 @@ Function Invoke-JiraTransitionIssue {
           }
         }
 
+        If ($issueStatus -ieq $TransitionName) {
+            "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($availableTransitionNames -join ', ')" `
+              | Write-Information
+
+            return [TransitionResultType]::Skipped
+        }
+
         $transitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $TransitionName }).id
         If ($null -eq $transitionId) {
             "[$issueKey] Missing transition [$TransitionName] on $issueType! Currently in [$issueStatus] state. Available transitions: $($availableTransitionNames -join ', ')" `
-              | Write-Information 
-    
+              | Write-Information
+
             return [TransitionResultType]::Unavailable
         }
+        
         If ($transitionId.Count -gt 1) {
             "[$issueKey] Multiple transitions found for [$TransitionName] on $issueType! Available transitions: $($transitionId -join ', ')" `
               | Write-Warning
     
             return [TransitionResultType]::Unavailable
-        }
-
-        $currentTransitionId = ($Issue.transitions | Where-Object { $_.name, $_.toName -icontains $issueStatus }).id
-        If ($currentTransitionId -eq $transitionId) {
-          "[$issueKey] $issueType already in status [$issueStatus]. Skipping transition! Available transitions: $($Issue.availableTransitionNames -join ', ')" `
-              | Write-Information
-
-          return [TransitionResultType]::Skipped
         }
         
         Write-Debug "[$issueKey] Transitioning $issueType from [$issueStatus] to [$TransitionName]..."
