@@ -95,15 +95,14 @@ try {
         Write-Debug $_.ScriptStackTrace
     }
     
-    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And $CreateWarningNotices) {
-        "::warning title=$MESSAGE_TITLE::No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..." `
-          | Write-Output
-    }
-
     If ($issues.Length -gt $MAX_ISSUES_TO_TRANSITION) {
         "Too many issues returned by the query [$($issues.Length)]. Adjust the the query to return less than or equal to $MAX_ISSUES_TO_TRANSITION issues." `
           | Write-Error
         Exit 1
+    }
+
+    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And $CreateWarningNotices) {
+        Write-Warning "No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..."
     }
 
     If ($issues.Length -gt 0) {
@@ -180,39 +179,33 @@ try {
     
     # Notices on Runner
     # ------------
-    If ($identifiedIssueKeys.Length -eq 0 -And $FailOnTransitionFailure) {
-        Write-Output "::error title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
+
+    If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
+        Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $( `
+          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input to ignore missing transitions. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
         Exit 1
     }
 
-    If ($identifiedIssueKeys.Length -eq 0 -And !$FailOnTransitionFailure) {
-        If ($CreateWarningNotices) { Write-Output "::warning title=$MESSAGE_TITLE::No issues were successfully transitioned. See job logs for details and action $env:GITHUB_ACTION_URL for additional help." }
-        Exit 0 
+    If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure -And $CreateWarningNotices) {
+        Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $($failedIssueKeys -join ', ') to [$TransitionName]."
     }
-
+    
     If ($unavailableTransitionIssueKeys.Length -gt 0 -And $FailOnTransitionFailure -And !$MissingTransitionAsSuccessful) {
         Write-Output "::error title=$MESSAGE_TITLE::$($unavailableTransitionIssueKeys -join ', ') missing transition [$TransitionName]. You may enable 'missing-transition-as-successful' to treat these as a successful transition."
         Exit 1
     }
 
-    If ($failedIssueKeys.Length -gt 0 -And $FailOnTransitionFailure) {
-        Write-Output "::error title=$MESSAGE_TITLE::Failed to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value or use the 'missing-transition-as-successful' action input. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
-        Exit 1
-    }
-
-    If ($failedIssueKeys.Length -gt 0 -And !$FailOnTransitionFailure -And $CreateWarningNotices) {
-        Write-Output "::warning title=$MESSAGE_TITLE::Unable to transition $( `
-          $failedIssueKeys -join ', ') to [$TransitionName]. You might need to include a missing field value. See job logs for details and action $env:GITHUB_ACTION_URL for additional help."
-    }
-
     If ($excludedIssueKeys.Length -gt 0 -And $FailIfIssueExcluded) {
-        Write-Output "::error title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query {$JqlToQueryBy}"
+        Write-Output "::error title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query"
         Exit 1
     }
 
     If ($excludedIssueKeys.Length -gt 0 -And !$FailIfIssueExcluded -And $CreateWarningNotices) {
-        Write-Output "::warning title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query {$JqlToQueryBy}"
+        Write-Output "::warning title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query"
+    }
+
+    If ($excludedIssueKeys.Length -eq 0 -And $successfulyProcessedIssueKeys.Length -eq 0 -And $CreateWarningNotices) {
+        Write-Output "::warning title=$MESSAGE_TITLE::No issues were transitioned into [$TransitionName]."
     }
 
     Exit 0
