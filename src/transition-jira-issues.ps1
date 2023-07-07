@@ -101,11 +101,10 @@ try {
         Exit 1
     }
 
-    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And $CreateWarningNotices) {
+    If ($issues.Length -eq 0) {
         Write-Warning "No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..."
     }
-
-    If ($issues.Length -gt 0) {
+    Else {
         Write-Information "Processing $($issues.Length) issues from query with results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
     }
 
