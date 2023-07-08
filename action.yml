@@ -73,6 +73,10 @@ outputs:
     description: Issues successfully transitioned, skipped or (if enabled) unavailable.
     value: ${{ steps.transition.outputs.processedIssues }}
     
+  transitioned-issues:
+    description: Issues successfully transitioned.
+    value: ${{ steps.transition.outputs.transitionedIssues }}
+    
   failed-issues:
     description: Issues in Jira not successfully processed.
     value: ${{ steps.transition.outputs.failedIssues }}
@@ -88,6 +92,10 @@ outputs:
   is-successful:
     description: One or more issues were transitioned successfully and/or skipped.
     value: ${{ steps.transition.outputs.isSuccessful }}
+    
+  some-transitioned:
+    description: Some issues were transitioned successfully.
+    value: ${{ steps.transition.outputs.has_transitionedIssues }}
     
   some-identified:
     description: Some issues were found in Jira.

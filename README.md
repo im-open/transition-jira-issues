@@ -43,17 +43,19 @@ Work items, tickets, etc. are referenced as "issues" in this action.
 
 ## Outputs
 
-| Output               | Description                                                                                                                                           | Type                 |
-|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|
-| `processed-issues`   | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition.                                                            | Comma-delimited list |
-| `failed-issues`      | Issues in Jira not successfully processed.                                                                                                            | Comma-delimited list |
-| `unavailable-issues` | Issues missing the specificed transition.                                                                                                             | Comma-delimited list |
-| `excluded-issues`    | Issues excluded that are listed in the `issues` input but not identified by query.                                                                     | Comma-delimited list |
-| `is-successful`      | One or more issues were transitioned successfully and/or skipped. _If `missing-transition-as-successful` enabled, also includes missing transitions._ | Boolean              |
-| `some-identified`    | Some issues were found in Jira.                                                                                                                       | Boolean              |
-| `some-unavailable`   | Some issues do not have transition.                                                                                                                   | Boolean              |
-| `some-skipped`       | Some issues skipped when already transitioned or other causes.                                                                                        | Boolean              |
-| `some-excluded`      | Some issues were excluded.                                                                                                                            | Boolean              |
+| Output                | Description                                                                                                                                           | Type                 |
+|-----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|
+| `processed-issues`    | Issues successfully transitioned, skipped and (if enabled) with an unavailable transition.                                                            | Comma-delimited list |
+| `transitioned-issues` | Issues successfully transitioned.                                                                                                                     | Comma-delimited list |
+| `failed-issues`       | Issues in Jira not successfully processed.                                                                                                            | Comma-delimited list |
+| `unavailable-issues`  | Issues missing the specificed transition.                                                                                                             | Comma-delimited list |
+| `excluded-issues`     | Issues excluded that are listed in the `issues` input but not identified by query.                                                                    | Comma-delimited list |
+| `is-successful`       | One or more issues were transitioned successfully and/or skipped. _If `missing-transition-as-successful` enabled, also includes missing transitions._ | Boolean              |
+| `some-identified`     | Some issues were found in Jira.                                                                                                                       | Boolean              |
+| `some-transitioned`   | Some issues were transitioned successfully.                                                                                                           | Boolean              |
+| `some-unavailable`    | Some issues do not have transition.                                                                                                                   | Boolean              |
+| `some-skipped`        | Some issues skipped when already transitioned or other causes.                                                                                        | Boolean              |
+| `some-excluded`       | Some issues were excluded.                                                                                                                            | Boolean              |
 
 ## Example
 
