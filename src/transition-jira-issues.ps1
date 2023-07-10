@@ -64,6 +64,8 @@ try {
     $baseUri = New-Object -TypeName System.Uri -ArgumentList "https://$JiraDomain/"
     $authorizationHeaders = Get-AuthorizationHeaders -Username $JiraUsername -Password $JiraPassword 
     Write-Output "::add-mask::$($authorizationHeaders.Authorization)"
+    
+    $IssueKeys = $IssueKeys | Select-Object -Unique
 
     If ([string]::IsNullOrEmpty($JqlToQueryBy) -And $IssueKeys.Length -gt 0) {
         $JqlToQueryBy = "key IN ($($IssueKeys -join ", "))"
@@ -101,11 +103,10 @@ try {
         Exit 1
     }
 
-    If ($issues.Length -eq 0 -And !$FailIfJiraInaccessible -And $CreateWarningNotices) {
+    If ($issues.Length -eq 0) {
         Write-Warning "No issues were found that match query {$JqlToQueryBy}. Jira might be down. Skipping check..."
     }
-
-    If ($issues.Length -gt 0) {
+    Else {
         Write-Information "Processing $($issues.Length) issues from query with results [$(@($issues | Select-Object -ExpandProperty key) -join ', ')]..."
     }
 
