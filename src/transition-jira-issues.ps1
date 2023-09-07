@@ -197,12 +197,12 @@ try {
     }
 
     If ($excludedIssueKeys.Length -gt 0 -And $FailIfIssueExcluded) {
-        Write-Output "::error title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query"
+        Write-Output "::error title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from original query"
         Exit 1
     }
 
     If ($excludedIssueKeys.Length -gt 0 -And !$FailIfIssueExcluded -And $CreateWarningNotices) {
-        Write-Output "::warning title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from origin query"
+        Write-Output "::warning title=$MESSAGE_TITLE::$($excludedIssueKeys -join ', ') excluded from original query"
     }
 
     If ($excludedIssueKeys.Length -eq 0 -And $successfulyProcessedIssueKeys.Length -eq 0 -And $CreateWarningNotices) {
