@@ -23,6 +23,9 @@ If the Jira server is hosted on an internal network, then the action must run on
   - [Code of Conduct](#code-of-conduct)
   - [License](#license)
 
+> [!TIP] Troubleshooting
+> See [Most Common Problems](https://github.com/im-enrollment/jira-issues/wiki/Most-Common-Problems) for assistance
+
 ## Inputs
 
 Work items, tickets, etc. are referenced as "issues" in this action.
